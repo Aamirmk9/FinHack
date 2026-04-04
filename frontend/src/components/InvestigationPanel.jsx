@@ -85,8 +85,8 @@ export default function InvestigationPanel() {
                 borderLeft: selectedClusterId === alert.cluster_id ? '2px solid #ef4444' : '2px solid transparent',
                 transition: 'background 0.1s',
               }}
-              onMouseEnter={(e) => { if (selectedClusterId !== alert.cluster_id) e.currentTarget.style.background = '#161616'; }}
-              onMouseLeave={(e) => { if (selectedClusterId !== alert.cluster_id) e.currentTarget.style.background = '#fff'; }}
+              onMouseEnter={(e) => { if (selectedClusterId !== alert.cluster_id) e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; }}
+              onMouseLeave={(e) => { if (selectedClusterId !== alert.cluster_id) e.currentTarget.style.background = 'var(--bg-card)'; }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <div style={{ width: 5, height: 5, borderRadius: 3, background: riskColor(alert.score) }} />
@@ -294,7 +294,7 @@ export default function InvestigationPanel() {
                 }))}>
                   <XAxis dataKey="name" stroke="#333333" fontSize={9} angle={-45} textAnchor="end" height={50} tickLine={false} axisLine={false} />
                   <YAxis stroke="#333333" fontSize={9} domain={[0, 100]} tickLine={false} axisLine={false} />
-                  <Tooltip contentStyle={tt} />
+                  <Tooltip contentStyle={tt} cursor={false} />
                   <Bar dataKey="score" name="Risk Score" radius={[3, 3, 0, 0]}>
                     {(clusterData.wallets || []).slice(0, 15).map((w, i) => (
                       <Cell key={i} fill={riskColor(w.score)} />

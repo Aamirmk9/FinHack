@@ -97,16 +97,17 @@ export default function Dashboard() {
     100
   );
   const scorePercent = Math.max(0, Math.min(100, 100 - threatLevel));
-  const getGrade = (s) => {
-    if (s >= 90) return { letter: 'A+', label: 'Excellent' };
-    if (s >= 80) return { letter: 'A', label: 'Strong' };
-    if (s >= 70) return { letter: 'B', label: 'Adequate' };
-    if (s >= 60) return { letter: 'C', label: 'Fair' };
-    if (s >= 40) return { letter: 'D', label: 'Poor' };
-    return { letter: 'F', label: 'Critical' };
-  };
-  const grade = getGrade(scorePercent);
-  const gradeColor = scorePercent >= 80 ? '#ef4444' : scorePercent >= 70 ? '#16a34a' : scorePercent >= 60 ? '#d97706' : scorePercent >= 40 ? '#ea580c' : '#dc2626';
+  // Grade thresholds — equal segments on the bar (each ~16.7% width)
+  const GRADES = [
+    { min: 83.4, letter: 'A+', label: 'Excellent', color: '#15803d' },
+    { min: 66.7, letter: 'A',  label: 'Strong',    color: '#22c55e' },
+    { min: 50.0, letter: 'B',  label: 'Adequate',  color: '#a3e635' },
+    { min: 33.3, letter: 'C',  label: 'Fair',      color: '#eab308' },
+    { min: 16.7, letter: 'D',  label: 'Poor',      color: '#ea580c' },
+    { min: 0,    letter: 'F',  label: 'Critical',  color: '#dc2626' },
+  ];
+  const grade = GRADES.find(g => scorePercent >= g.min) || GRADES[GRADES.length - 1];
+  const gradeColor = grade.color;
 
   const riskDist = [
     { name: 'Critical', value: stats.critical_clusters || 1, color: RISK_COLORS.critical },
@@ -163,39 +164,30 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Colored segmented bar */}
+          {/* Gradient grade bar — equal segments, green (A+) to red (F) */}
           <div style={{ position: 'relative' }}>
-            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
               {[
-                { end: 40, color: '#7f1d1d', label: 'F' },
-                { end: 60, color: '#dc2626', label: 'D' },
-                { end: 70, color: '#d97706', label: 'C' },
-                { end: 85, color: '#16a34a', label: 'B' },
-                { end: 100, color: '#ef4444', label: 'A' },
-              ].map((seg, i, arr) => {
-                const start = i === 0 ? 0 : arr[i - 1].end;
-                return (
-                  <div key={i} style={{
-                    flex: seg.end - start, background: seg.color,
-                    opacity: scorePercent >= start ? 1 : 0.15,
-                  }} />
-                );
-              })}
-            </div>
-            {/* Labels underneath */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              {[
-                { label: 'F', pos: '0%' },
-                { label: 'D', pos: '40%' },
-                { label: 'C', pos: '60%' },
-                { label: 'B', pos: '70%' },
-                { label: 'A', pos: '85%' },
-                { label: 'A+', pos: '100%' },
-              ].map(l => (
-                <span key={l.label} style={{ fontSize: 9, color: '#666', fontWeight: 600 }}>{l.label}</span>
+                { color: '#dc2626' },  // F
+                { color: '#ea580c' },  // D
+                { color: '#eab308' },  // C
+                { color: '#a3e635' },  // B
+                { color: '#22c55e' },  // A
+                { color: '#15803d' },  // A+
+              ].map((seg, i) => (
+                <div key={i} style={{
+                  flex: 1, background: seg.color,
+                  opacity: scorePercent >= (i * 100 / 6) ? 1 : 0.15,
+                }} />
               ))}
             </div>
-            {/* Marker */}
+            {/* Labels underneath — equally spaced */}
+            <div style={{ display: 'flex', marginTop: 4 }}>
+              {['F', 'D', 'C', 'B', 'A', 'A+'].map((label) => (
+                <span key={label} style={{ flex: 1, fontSize: 9, color: '#666', fontWeight: 600, textAlign: 'center' }}>{label}</span>
+              ))}
+            </div>
+            {/* Marker — positioned to match the score */}
             <div style={{
               position: 'absolute', top: -4, left: `${scorePercent}%`, transform: 'translateX(-50%)',
               width: 2, height: 16, background: '#e0e0e0', borderRadius: 1,
@@ -209,8 +201,8 @@ export default function Dashboard() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
             <StatsCard label="Transactions" value={stats.total_transactions} delay={30} />
             <StatsCard label="Wallets" value={stats.total_wallets} delay={60} />
-            <StatsCard label="Flagged" value={stats.high_risk_wallets} color="#dc2626" delay={90} />
-            <StatsCard label="Urgent" value={stats.urgent_cases || 0} color="#ea580c" delay={120} />
+            <StatsCard label="Flagged" value={allAlerts.length} color="#dc2626" delay={90} />
+            <StatsCard label="Urgent" value={allAlerts.filter(a => a.risk_level === 'high' || a.risk_level === 'critical').length} color="#ea580c" delay={120} />
             <StatsCard label="Clusters" value={stats.total_clusters || 0} delay={150} />
           </div>
         </div>
