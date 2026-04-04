@@ -1,5 +1,6 @@
 """FastAPI application — runs the full detection pipeline on startup."""
 
+import os
 import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,7 @@ from api.routes import router, set_state
 from api.inject import inject_router
 from api.websocket import manager
 from data.generator import generate_dataset
+from data.ethereum import fetch_ethereum_dataset, load_cached_dataset
 from engine.graph_builder import build_graph
 from engine.community import detect_communities
 from engine.features import compute_node_features, compute_cluster_features
@@ -46,8 +48,19 @@ def run_pipeline():
 
     t0 = time.time()
 
-    print("[1/9] Generating synthetic blockchain data...")
-    transactions, labels = generate_dataset(n_wallets=3000, n_legitimate_txns=50000, n_laundering_rings=12, seed=42)
+    data_source = os.getenv("DATA_SOURCE", "synthetic")
+
+    if data_source == "ethereum":
+        print("[1/9] Loading real Ethereum blockchain data...")
+        cached = load_cached_dataset()
+        if cached:
+            transactions, labels = cached
+        else:
+            transactions, labels = fetch_ethereum_dataset()
+    else:
+        print("[1/9] Generating synthetic blockchain data...")
+        transactions, labels = generate_dataset(n_wallets=3000, n_legitimate_txns=50000, n_laundering_rings=15, seed=42)
+
     set_state("transactions", transactions)
     set_state("labels", labels)
     print(f"       {len(transactions)} transactions, {len(labels)} wallets")

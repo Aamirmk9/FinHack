@@ -60,6 +60,16 @@ class MLDetector:
                 y.append(1 if labels[addr] == "suspicious" else 0)
 
         X, y = np.array(X), np.array(y)
+        n_suspicious = int(y.sum())
+        n_legitimate = len(y) - n_suspicious
+
+        if n_suspicious < 20 or n_legitimate < 20:
+            print(f"       ML skipped: insufficient labels ({n_suspicious} suspicious, {n_legitimate} legitimate)")
+            self.metrics = {"precision": 0, "recall": 0, "f1": 0, "accuracy": 0, "skipped": True}
+            self._skipped = True
+            return self.metrics
+
+        self._skipped = False
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
         self.model.fit(X_train, y_train)
 
@@ -90,7 +100,7 @@ class HybridDetector:
     def run(self, G, transactions, node_features, cluster_features, labels):
         rule_flags = self.rule_detector.detect(G, transactions, node_features)
         self.ml_detector.train(node_features, labels)
-        ml_probas = self.ml_detector.predict_proba(node_features)
+        ml_probas = self.ml_detector.predict_proba(node_features) if not getattr(self.ml_detector, '_skipped', False) else {}
 
         results = {}
         for addr in node_features:

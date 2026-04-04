@@ -80,11 +80,11 @@ def _generate_layering(ring_id: int, start: datetime) -> tuple[list[dict], list[
 
 def _generate_structuring(ring_id: int, start: datetime) -> tuple[list[dict], list[str]]:
     source = _make_address(f"struct_src_{ring_id}", 0)
-    destinations = [_make_address(f"struct_dst_{ring_id}", i) for i in range(random.randint(5, 10))]
+    destinations = [_make_address(f"struct_dst_{ring_id}", i) for i in range(random.randint(8, 15))]
     txns = []
     t = start + timedelta(hours=random.randint(0, 72))
 
-    for _ in range(random.randint(15, 30)):
+    for _ in range(random.randint(25, 45)):
         dest = random.choice(destinations)
         amount = round(random.uniform(8500, 9999), 2)
         t += timedelta(hours=random.randint(4, 24))
@@ -97,7 +97,7 @@ def _generate_structuring(ring_id: int, start: datetime) -> tuple[list[dict], li
 
 
 def _generate_round_tripping(ring_id: int, start: datetime) -> tuple[list[dict], list[str]]:
-    chain_len = random.randint(5, 10)
+    chain_len = random.randint(8, 14)
     wallets = [_make_address(f"round_{ring_id}", i) for i in range(chain_len)]
     txns = []
     t = start + timedelta(hours=random.randint(0, 48))
@@ -136,7 +136,7 @@ def _generate_rapid_relay(ring_id: int, start: datetime) -> tuple[list[dict], li
 def _generate_fan_out_fan_in(ring_id: int, start: datetime) -> tuple[list[dict], list[str]]:
     source = _make_address(f"fan_src_{ring_id}", 0)
     collectors = [_make_address(f"fan_collect_{ring_id}", i) for i in range(2)]
-    middles = [_make_address(f"fan_mid_{ring_id}", i) for i in range(random.randint(15, 25))]
+    middles = [_make_address(f"fan_mid_{ring_id}", i) for i in range(random.randint(10, 15))]
     txns = []
     t = start + timedelta(hours=random.randint(0, 48))
     total = random.uniform(100_000, 500_000)
@@ -173,7 +173,7 @@ _PATTERN_GENERATORS = [
 def generate_dataset(
     n_wallets: int = 3000,
     n_legitimate_txns: int = 50000,
-    n_laundering_rings: int = 12,
+    n_laundering_rings: int = 15,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, dict[str, str]]:
     random.seed(seed)
@@ -187,8 +187,20 @@ def generate_dataset(
 
     all_txns = _generate_legitimate_transactions(legit_wallets, n_legitimate_txns, start_date, end_date)
 
+    # Ensure each typology gets at least 3 rings for visible radar coverage
+    ring_assignments = []
+    per_type = max(2, n_laundering_rings // len(_PATTERN_GENERATORS))
+    for gen_fn in _PATTERN_GENERATORS:
+        for _ in range(per_type):
+            ring_assignments.append(gen_fn)
+    # Fill remaining slots round-robin
+    while len(ring_assignments) < n_laundering_rings:
+        ring_assignments.append(_PATTERN_GENERATORS[len(ring_assignments) % len(_PATTERN_GENERATORS)])
+    ring_assignments = ring_assignments[:n_laundering_rings]
+    random.shuffle(ring_assignments)
+
     for ring_id in range(n_laundering_rings):
-        gen_fn = _PATTERN_GENERATORS[ring_id % len(_PATTERN_GENERATORS)]
+        gen_fn = ring_assignments[ring_id]
         txns, suspicious_wallets = gen_fn(ring_id, start_date)
         all_txns.extend(txns)
         for w in suspicious_wallets:

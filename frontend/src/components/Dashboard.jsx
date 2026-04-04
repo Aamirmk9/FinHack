@@ -4,8 +4,9 @@ import {
   PieChart, Pie, Cell, Tooltip,
   ResponsiveContainer, LineChart, Line, XAxis, YAxis,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, Legend,
 } from 'recharts';
-import { fetchStats, fetchAlerts, fetchCompare } from '../api/client';
+import { fetchStats, fetchAlerts, fetchCompare, fetchChartData } from '../api/client';
 import { formatCurrency, riskColor } from '../utils/formatters';
 import StatsCard from './StatsCard';
 import AnimatedNumber from './AnimatedNumber';
@@ -18,30 +19,7 @@ const RISK_COLORS = {
   low: '#16a34a',
 };
 
-const generateActivityData = () => {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  let base = 40;
-  return months.map(m => {
-    base += Math.floor(Math.random() * 30 - 12);
-    base = Math.max(10, Math.min(95, base));
-    const avg = base + Math.floor(Math.random() * 20 - 10);
-    return { month: m, score: base, avg: Math.max(5, Math.min(95, avg)) };
-  });
-};
 
-const generateRadarData = () => {
-  const cats = [
-    'Structuring','Layering','Round-Trip','Fan-Out','Rapid Relay',
-    'Smurfing','Peel Chain','Mixer Use','Shell Corp','Cross-Border',
-    'Dormant Acct','High Freq',
-  ];
-  return cats.map((c, i) => ({
-    category: (i + 1).toString(),
-    fullName: c,
-    detected: Math.floor(Math.random() * 60 + 30),
-    baseline: Math.floor(Math.random() * 40 + 20),
-  }));
-};
 
 const tt = {
   background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.08)',
@@ -53,15 +31,26 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [compare, setCompare] = useState(null);
   const [liveAlerts, setLiveAlerts] = useState([]);
-  const [activityData] = useState(generateActivityData);
-  const [radarData] = useState(generateRadarData);
+  const [activityData, setActivityData] = useState([]);
+  const [radarData, setRadarData] = useState([]);
   const navigate = useNavigate();
   const { lastUpdate } = useWebSocket();
 
   useEffect(() => {
     fetchStats().then(setStats).catch(() => {});
-    fetchAlerts(10).then(setAlerts).catch(() => {});
+    fetchAlerts(100).then(setAlerts).catch(() => {});
     fetchCompare().then(setCompare).catch(() => {});
+    fetchChartData().then(data => {
+      if (data.monthly_timeline) setActivityData(data.monthly_timeline);
+      if (data.typology_coverage) {
+        setRadarData(data.typology_coverage.map(t => ({
+          category: t.name,
+          fullName: t.name,
+          detected: t.detected,
+          baseline: t.baseline,
+        })));
+      }
+    }).catch(() => {});
   }, []);
 
   const [alertBanner, setAlertBanner] = useState(null);
@@ -104,11 +93,10 @@ export default function Dashboard() {
   }
 
   // Score bar: compute overall "grade"
-  const threatLevel = Math.min(
-    (stats.high_risk_wallets * 3 + stats.medium_risk_wallets * 1.5 + stats.critical_clusters * 10) / 5,
-    100
-  );
-  const scorePercent = Math.max(0, Math.min(100, 100 - threatLevel));
+  const totalWallets = stats.total_wallets || 1;
+  const riskyWallets = (stats.critical_wallets || 0) + stats.high_risk_wallets + stats.medium_risk_wallets;
+  const riskRatio = riskyWallets / totalWallets;
+  const scorePercent = Math.max(0, Math.min(100, Math.round(100 - riskRatio * 100)));
   // Grade thresholds — equal segments on the bar (each ~16.7% width)
   const GRADES = [
     { min: 83.4, letter: 'A+', label: 'Excellent', color: '#15803d' },
@@ -122,9 +110,10 @@ export default function Dashboard() {
   const gradeColor = grade.color;
 
   const riskDist = [
-    { name: 'Critical', value: stats.critical_clusters || 1, color: RISK_COLORS.critical },
-    { name: 'High', value: stats.high_risk_wallets || 1, color: RISK_COLORS.high },
+    { name: 'Critical', value: stats.critical_wallets, color: RISK_COLORS.critical },
+    { name: 'High', value: stats.high_risk_wallets, color: RISK_COLORS.high },
     { name: 'Medium', value: stats.medium_risk_wallets, color: RISK_COLORS.medium },
+    { name: 'Elevated', value: stats.elevated_risk_wallets, color: '#eab308' },
   ].filter(d => d.value > 0);
 
   const allAlerts = [
@@ -287,17 +276,17 @@ export default function Dashboard() {
 
         {/* Charts — Line + Radar like the screenshot */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {/* Line chart */}
+          {/* Line chart — Baseline vs Detected */}
           <div className="glass-card" style={{ padding: '16px 18px' }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: '0 0 2px' }}>
-              Detection score over time
+              Baseline vs Detected
             </p>
             <p style={{ fontSize: 10, color: '#666', margin: '0 0 12px' }}>
-              Track detection confidence scores over time
+              Rule-based baseline vs hybrid model detection rate
             </p>
             <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 10, color: '#666' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#ef4444' }} /> ARIA
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#ef4444' }} /> Detected
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: 4, background: '#4ade80' }} /> Baseline
@@ -306,10 +295,10 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={180}>
               <LineChart data={activityData}>
                 <XAxis dataKey="month" stroke="#333333" fontSize={9} tickLine={false} axisLine={false} />
-                <YAxis stroke="#333333" fontSize={9} tickLine={false} axisLine={false} domain={[0, 100]} />
+                <YAxis stroke="#333333" fontSize={9} tickLine={false} axisLine={false} domain={[0, 'auto']} />
                 <Tooltip contentStyle={tt} />
-                <Line type="monotone" dataKey="score" stroke="#ef4444" strokeWidth={2} dot={{ r: 3, fill: '#ef4444' }} name="ARIA" />
-                <Line type="monotone" dataKey="avg" stroke="#4ade80" strokeWidth={2} dot={{ r: 3, fill: '#4ade80' }} name="Baseline" />
+                <Line type="monotone" dataKey="score" stroke="#ef4444" strokeWidth={2} dot={{ r: 3, fill: '#ef4444' }} name="Detected" />
+                <Line type="monotone" dataKey="baseline" stroke="#4ade80" strokeWidth={2} dot={{ r: 3, fill: '#4ade80' }} name="Baseline" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -346,23 +335,36 @@ export default function Dashboard() {
         {/* Risk Breakdown */}
         <div>
           <p className="section-label">Risk Breakdown</p>
-          <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 24 }}>
-            <ResponsiveContainer width={100} height={85}>
+          <div className="glass-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={riskDist} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                  innerRadius={22} outerRadius={38} strokeWidth={0} paddingAngle={2}>
+                  innerRadius={50} outerRadius={85} strokeWidth={0} paddingAngle={3}
+                  label={({ name, value, percent, cx, cy, midAngle, outerRadius, index }) => {
+                    const RADIAN = Math.PI / 180;
+                    const total = riskDist.reduce((s, d) => s + d.value, 0);
+                    const pct = Math.round((value / total) * 100);
+                    const radius = outerRadius + 28;
+                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                    return (
+                      <text x={x} y={y} fill="#ccc" textAnchor={x > cx ? 'start' : 'end'}
+                        dominantBaseline="central" fontSize={11} fontWeight={600}>
+                        {value.toLocaleString()} ({pct}%)
+                      </text>
+                    );
+                  }}
+                  labelLine={{ stroke: '#666', strokeWidth: 1 }}
+                >
                   {riskDist.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', marginTop: 4 }}>
               {riskDist.map(d => (
-                <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
-                    <span style={{ fontSize: 12, color: '#bbb', fontWeight: 500 }}>{d.name}</span>
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: d.color }}>{d.value}</span>
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 2, background: d.color }} />
+                  <span style={{ fontSize: 12, color: '#bbb', fontWeight: 500 }}>{d.name}</span>
                 </div>
               ))}
             </div>
@@ -438,29 +440,32 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ML Accuracy — compact colored bar at bottom right */}
-        {mlMetrics && (
+        {/* Baseline vs Detected — performance comparison */}
+        {compare && (
           <div className="glass-card" style={{ padding: '12px 14px' }}>
-            <p style={{ fontSize: 10, fontWeight: 600, color: '#bbb', margin: '0 0 8px' }}>Model Accuracy</p>
-            <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 6 }}>
-              <div style={{ flex: mlMetrics.precision * 100, background: '#ef4444', borderRadius: '3px 0 0 3px' }} title="Precision" />
-              <div style={{ flex: mlMetrics.recall * 100, background: '#f97316' }} title="Recall" />
-              <div style={{ flex: mlMetrics.f1 * 100, background: '#7c3aed' }} title="F1" />
-              <div style={{ flex: mlMetrics.accuracy * 100, background: '#16a34a', borderRadius: '0 3px 3px 0' }} title="Accuracy" />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#666' }}>
-              {[
-                { label: 'Precision', val: mlMetrics.precision, color: '#ef4444' },
-                { label: 'Recall', val: mlMetrics.recall, color: '#f97316' },
-                { label: 'F1', val: mlMetrics.f1, color: '#7c3aed' },
-                { label: 'Accuracy', val: mlMetrics.accuracy, color: '#16a34a' },
-              ].map(m => (
-                <div key={m.label} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <div style={{ width: 5, height: 5, borderRadius: 2, background: m.color }} />
-                  <span>{m.label}</span>
-                  <span style={{ fontWeight: 700, color: m.color }}>{(m.val * 100).toFixed(0)}%</span>
-                </div>
-              ))}
+            <p style={{ fontSize: 10, fontWeight: 600, color: '#bbb', margin: '0 0 2px' }}>Baseline vs Detected</p>
+            <p style={{ fontSize: 9, color: '#555', margin: '0 0 8px' }}>Rule-based vs hybrid model performance</p>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={[
+                { metric: 'Precision', baseline: Math.round(compare.rule_based.precision * 100), detected: Math.round(compare.hybrid.precision * 100) },
+                { metric: 'Recall', baseline: Math.round(compare.rule_based.recall * 100), detected: Math.round(compare.hybrid.recall * 100) },
+                { metric: 'F1', baseline: Math.round(compare.rule_based.f1 * 100), detected: Math.round(compare.hybrid.f1 * 100) },
+                { metric: 'Accuracy', baseline: Math.round(compare.rule_based.accuracy * 100), detected: Math.round(compare.hybrid.accuracy * 100) },
+              ]} barGap={2} barCategoryGap="20%">
+                <XAxis dataKey="metric" stroke="#333" fontSize={9} tickLine={false} axisLine={false} />
+                <YAxis stroke="#333" fontSize={9} tickLine={false} axisLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={tt} formatter={(v) => `${v}%`} />
+                <Bar dataKey="baseline" fill="#4ade80" name="Baseline" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="detected" fill="#ef4444" name="Detected" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 9, color: '#666' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: '#4ade80' }} /> Baseline (Rules)
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: '#ef4444' }} /> Detected (Hybrid)
+              </span>
             </div>
           </div>
         )}

@@ -11,4 +11,5 @@ export const fetchCluster = (id) => api.get(`/cluster/${id}`).then(r => r.data);
 export const fetchWallet = (address) => api.get(`/wallet/${address}`).then(r => r.data);
 export const fetchTimeline = (clusterId) => api.get(`/timeline/${clusterId}`).then(r => r.data);
 export const fetchCompare = () => api.get('/compare').then(r => r.data);
+export const fetchChartData = () => api.get('/chart-data').then(r => r.data);
 export const generateSAR = (clusterId) => api.post(`/sar/${clusterId}`).then(r => r.data);

@@ -18,21 +18,13 @@
       "Bash(git push:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(git rebase:*)",
-      "Bash(grep -E \"\\\\.\\(md|json|txt|env|dockerfile|yml|yaml\\)$\")",
-      "Bash(grep -E \"\\\\.\\(py|txt|yml|yaml|env|dockerfile\\)$\")",
-      "Bash(grep:*)",
-      "Bash(curl -s http://localhost:8000/api/alerts?limit=10)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Alert count: {len\\(d\\)}'\\); print\\(f'High risk: {sum\\(1 for a in d if a.get\\(\\\\\"risk_level\\\\\"\\)==\\\\\"high\\\\\"\\)}'\\); print\\(f'Medium: {sum\\(1 for a in d if a.get\\(\\\\\"risk_level\\\\\"\\)==\\\\\"medium\\\\\"\\)}'\\)\")",
-      "Bash(curl -s \"http://localhost:8000/api/alerts?limit=10\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Alert count: {len\\(d\\)}'\\); [print\\(f'  Cluster {a[\\\\\"cluster_id\\\\\"]}: {a[\\\\\"risk_level\\\\\"]}'\\) for a in d[:5]]\")",
-      "Bash(curl -s \"http://localhost:8000/api/stats\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'Total clusters: {d[\\\\\"total_clusters\\\\\"]}'\\)\")",
-      "Bash(curl -s \"http://localhost:8000/api/alerts?limit=50\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); high=sum\\(1 for a in d if a['risk_level'] in \\('high','critical'\\)\\); print\\(f'High+Critical clusters: {high}'\\)\")",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(f'total_clusters: {d[\\\\\"total_clusters\\\\\"]}'\\)\")",
-      "Bash(curl -s \"http://localhost:8000/api/network?min_score=0&max_nodes=400\")",
-      "Bash(python3 -c ':*)"
+      "Bash(pip3 show:*)",
+      "Bash(python3 build_pptx.py)",
+      "Bash(python3 -m http.server 8888)",
+      "Bash(echo \"Server PID: $!\")",
+      "Bash(tasklist)",
+      "Bash(python:*)",
+      "Bash(curl -s http://localhost:8000/api/alerts?limit=100)"
     ]
   },
   "enabledPlugins": {
