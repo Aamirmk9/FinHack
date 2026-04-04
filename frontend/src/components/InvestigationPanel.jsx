@@ -36,16 +36,22 @@ export default function InvestigationPanel() {
     fetchCluster(id).then((data) => { setClusterData(data); setLoading(false); });
   };
 
-  const handleGenerateSAR = () => {
+  const handleGenerateSAR = async () => {
     setSarLoading(true);
-    generateSAR(selectedClusterId)
-      .then((data) => {
-        setSarData(data);
-        setSarLoading(false);
-      })
-      .catch(() => {
-        setSarLoading(false);
+    try {
+      const data = await generateSAR(selectedClusterId);
+      console.log('SAR response:', data);
+      setSarData(data);
+    } catch (err) {
+      console.error('SAR error:', err);
+      // Show template fallback on any error
+      setSarData({
+        cluster_id: selectedClusterId,
+        sar_narrative: 'Error generating SAR. Please restart the backend server and try again.',
+        generated_by: 'error',
       });
+    }
+    setSarLoading(false);
   };
 
   const typo = clusterData?.typology || {};
