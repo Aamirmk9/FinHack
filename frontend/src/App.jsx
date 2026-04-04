@@ -6,6 +6,7 @@ import NetworkGraph from './components/NetworkGraph';
 import InvestigationPanel from './components/InvestigationPanel';
 import Timeline from './components/Timeline';
 import SendPage from './components/SendPage';
+import DemoWallet from './components/DemoWallet';
 import LiveToast from './components/LiveToast';
 import useWebSocket from './hooks/useWebSocket';
 
@@ -31,6 +32,8 @@ function AppContent() {
         </Route>
         {/* Mobile send page — no layout wrapper */}
         <Route path="/send" element={<SendPage />} />
+        {/* Demo wallet — mobile bank app for live presentations */}
+        <Route path="/demo" element={<DemoWallet />} />
       </Routes>
 
       {/* Live transaction toast — shows on all pages */}

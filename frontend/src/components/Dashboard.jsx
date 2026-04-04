@@ -10,6 +10,7 @@ import StatsCard from './StatsCard';
 import RiskGauge from './RiskGauge';
 import ParticleBackground from './ParticleBackground';
 import AnimatedNumber from './AnimatedNumber';
+import useWebSocket from '../hooks/useWebSocket';
 
 const RISK_COLORS = {
   critical: '#ef4444',
@@ -29,13 +30,34 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [compare, setCompare] = useState(null);
+  const [liveAlerts, setLiveAlerts] = useState([]);
   const navigate = useNavigate();
+  const { lastUpdate } = useWebSocket();
 
   useEffect(() => {
     fetchStats().then(setStats);
     fetchAlerts(10).then(setAlerts);
     fetchCompare().then(setCompare);
   }, []);
+
+  // Auto-refresh dashboard when live transaction comes in
+  useEffect(() => {
+    if (lastUpdate && lastUpdate.type === 'transaction_injected') {
+      // Re-fetch stats and alerts immediately
+      fetchStats().then(setStats);
+      fetchAlerts(10).then(setAlerts);
+      // Add live alert to top of feed with animation flag
+      if (lastUpdate.alert) {
+        setLiveAlerts(prev => [{
+          ...lastUpdate.alert,
+          total_volume: lastUpdate.transaction.amount,
+          flags: [...(lastUpdate.sender.flags || []), ...(lastUpdate.receiver.flags || [])],
+          isNew: true,
+          timestamp: Date.now(),
+        }, ...prev.slice(0, 4)]);
+      }
+    }
+  }, [lastUpdate]);
 
   if (!stats) {
     return (
@@ -123,6 +145,56 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
+
+        {/* Live Alerts from Demo */}
+        {liveAlerts.length > 0 && (
+          <div className="glass-card glow-red animate-fade-in-up" style={{ border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <div className="p-5 border-b flex items-center gap-2" style={{ borderColor: 'rgba(239, 68, 68, 0.15)' }}>
+              <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--risk-critical)', boxShadow: '0 0 8px var(--risk-critical)' }} />
+              <h3 className="text-sm font-bold" style={{ color: 'var(--risk-critical)' }}>LIVE — Threat Detection Feed</h3>
+            </div>
+            <div className="divide-y" style={{ borderColor: 'rgba(239, 68, 68, 0.1)' }}>
+              {liveAlerts.map((alert, i) => (
+                <div key={`live-${alert.cluster_id}-${alert.timestamp}`}
+                  className="flex items-center justify-between px-5 py-4 cursor-pointer animate-fade-in-up"
+                  style={{ background: 'rgba(239, 68, 68, 0.03)' }}
+                  onClick={() => navigate(`/investigation?cluster=${alert.cluster_id}`)}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-3 h-3 rounded-full risk-pulse"
+                      style={{ background: RISK_COLORS[alert.risk_level] || RISK_COLORS.high, boxShadow: `0 0 10px ${RISK_COLORS[alert.risk_level] || RISK_COLORS.high}` }} />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold" style={{ color: 'var(--risk-critical)' }}>Cluster #{alert.cluster_id}</span>
+                        <span className="text-xs px-2 py-0.5 rounded font-bold animate-pulse"
+                          style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                          NEW
+                        </span>
+                        {alert.typology && (
+                          <span className="text-xs px-1.5 py-0.5 rounded"
+                            style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
+                            {alert.typology}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                        {alert.size} wallets — detected just now
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs px-2 py-0.5 rounded font-bold"
+                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                      {alert.risk_level?.toUpperCase()}
+                    </span>
+                    <span className="text-lg font-bold tabular-nums" style={{ color: riskColor(alert.score) }}>
+                      {alert.score?.toFixed?.(1) || alert.score}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Alert Feed */}
         <div className="glass-card animate-fade-in-up" style={{ animationDelay: '0.3s' }}>

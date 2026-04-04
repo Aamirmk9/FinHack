@@ -31,10 +31,25 @@ export default function NetworkGraph() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const { lastUpdate } = useWebSocket();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [newNodeIds, setNewNodeIds] = useState(new Set());
+  const newNodeTimers = useRef({});
 
-  // Auto-refresh when a live transaction is injected
+  // Auto-refresh when a live transaction is injected + track new nodes
   useEffect(() => {
     if (lastUpdate && lastUpdate.type === 'transaction_injected') {
+      const injectedIds = [lastUpdate.sender?.address, lastUpdate.receiver?.address].filter(Boolean);
+      setNewNodeIds(prev => new Set([...prev, ...injectedIds]));
+      // Clear glow after 30s
+      injectedIds.forEach(id => {
+        if (newNodeTimers.current[id]) clearTimeout(newNodeTimers.current[id]);
+        newNodeTimers.current[id] = setTimeout(() => {
+          setNewNodeIds(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 30000);
+      });
       setRefreshKey(k => k + 1);
     }
   }, [lastUpdate]);
@@ -74,7 +89,7 @@ export default function NetworkGraph() {
     });
   }, [minScore, refreshKey]);
 
-  // Auto-rotate
+  // Auto-rotate + zoom to fit all nodes
   useEffect(() => {
     if (!loading && graphRef.current) {
       const controls = graphRef.current.controls();
@@ -82,7 +97,12 @@ export default function NetworkGraph() {
         controls.autoRotate = true;
         controls.autoRotateSpeed = 0.5;
       }
-      graphRef.current.cameraPosition({ z: 400 });
+      // Zoom out enough to see the full graph
+      setTimeout(() => {
+        if (graphRef.current) {
+          graphRef.current.zoomToFit(800, 80);
+        }
+      }, 500);
     }
   }, [loading]);
 
@@ -103,43 +123,57 @@ export default function NetworkGraph() {
   }, []);
 
   const nodeThreeObject = useCallback((node) => {
-    const color = node.nodeColor;
-    const radius = node.val;
+    const isNew = newNodeIds.has(node.id);
+    const color = isNew ? '#ff2020' : node.nodeColor;
+    const radius = isNew ? Math.max(node.val * 2.5, 6) : node.val;
     const group = new THREE.Group();
 
-    const geometry = new THREE.SphereGeometry(radius, 16, 16);
+    const geometry = new THREE.SphereGeometry(radius, 20, 20);
     const material = new THREE.MeshPhongMaterial({
       color: new THREE.Color(color),
       transparent: true,
-      opacity: 0.85,
+      opacity: isNew ? 1.0 : 0.85,
       emissive: new THREE.Color(color),
-      emissiveIntensity: node.score >= 40 ? 0.4 : 0.15,
+      emissiveIntensity: isNew ? 0.8 : (node.score >= 40 ? 0.4 : 0.15),
     });
     group.add(new THREE.Mesh(geometry, material));
 
-    if (node.score >= 40) {
+    // Ring for high-risk or new nodes
+    if (node.score >= 40 || isNew) {
       const ringGeometry = new THREE.RingGeometry(radius + 1.5, radius + 2.5, 32);
       const ringMaterial = new THREE.MeshBasicMaterial({
         color: new THREE.Color(color),
         transparent: true,
-        opacity: 0.25,
+        opacity: isNew ? 0.6 : 0.25,
         side: THREE.DoubleSide,
       });
       group.add(new THREE.Mesh(ringGeometry, ringMaterial));
     }
 
-    if (node.score >= 70) {
-      const glowGeometry = new THREE.SphereGeometry(radius * 2, 16, 16);
+    // Outer glow for critical or new nodes
+    if (node.score >= 70 || isNew) {
+      const glowGeometry = new THREE.SphereGeometry(radius * 2.5, 16, 16);
       const glowMaterial = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(color),
+        color: new THREE.Color(isNew ? '#ff0000' : color),
         transparent: true,
-        opacity: 0.08,
+        opacity: isNew ? 0.15 : 0.08,
       });
       group.add(new THREE.Mesh(glowGeometry, glowMaterial));
     }
 
+    // Extra pulsing outer shell for brand-new injected nodes
+    if (isNew) {
+      const pulseGeometry = new THREE.SphereGeometry(radius * 4, 16, 16);
+      const pulseMaterial = new THREE.MeshBasicMaterial({
+        color: new THREE.Color('#ff0000'),
+        transparent: true,
+        opacity: 0.05,
+      });
+      group.add(new THREE.Mesh(pulseGeometry, pulseMaterial));
+    }
+
     return group;
-  }, []);
+  }, [newNodeIds]);
 
   return (
     <div className="flex h-full gap-4 animate-fade-in">
