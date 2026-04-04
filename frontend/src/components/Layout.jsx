@@ -1,60 +1,62 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const navItems = [
-  { to: '/', label: 'Dashboard', icon: '\u25C9' },
-  { to: '/network', label: 'Network Explorer', icon: '\u25CE' },
-  { to: '/investigation', label: 'Investigation', icon: '\u2691' },
-  { to: '/timeline', label: 'Timeline', icon: '\u25F7' },
+  { to: '/', label: 'Dashboard', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    </svg>
+  )},
+  { to: '/network', label: 'Network', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><line x1="12" y1="7" x2="5" y2="17"/><line x1="12" y1="7" x2="19" y2="17"/>
+    </svg>
+  )},
+  { to: '/investigation', label: 'Investigate', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  )},
+  { to: '/timeline', label: 'Timeline', icon: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  )},
 ];
 
 export default function Layout() {
   return (
     <div className="flex h-screen" style={{ background: 'var(--bg-primary)' }}>
-      {/* Glassmorphism Sidebar */}
-      <nav className="w-60 flex-shrink-0 flex flex-col glass" style={{ borderRight: '1px solid var(--glass-border)' }}>
-        <div className="p-5 border-b" style={{ borderColor: 'var(--glass-border)' }}>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)' }} />
-            <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--accent-cyan)' }}>
-              ShadowTrace
-            </h1>
-          </div>
-          <p className="text-xs mt-1.5 tracking-wider uppercase" style={{ color: 'var(--text-secondary)', letterSpacing: '0.15em' }}>
-            Financial Intelligence
-          </p>
+      <nav style={{
+        width: 60, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', background: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--glass-border)', padding: '14px 0',
+      }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 10,
+          background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
         </div>
-        <div className="flex-1 py-3">
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, width: '100%', padding: '0 10px' }}>
           {navItems.map(({ to, label, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-5 py-3 text-sm transition-all duration-200 ${isActive ? 'font-semibold' : ''}`
-              }
+            <NavLink key={to} to={to} end={to === '/'} title={label}
               style={({ isActive }) => ({
-                color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                background: isActive ? 'rgba(6, 182, 212, 0.06)' : 'transparent',
-                borderLeft: isActive ? '2px solid var(--accent-cyan)' : '2px solid transparent',
-                boxShadow: isActive ? 'inset 0 0 30px rgba(6, 182, 212, 0.03)' : 'none',
-              })}
-            >
-              <span className="text-base opacity-70">{icon}</span>
-              {label}
+                width: 40, height: 40, borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: isActive ? '#ef4444' : '#666',
+                background: isActive ? 'rgba(239, 68, 68, 0.06)' : 'transparent',
+                transition: 'all 0.15s', textDecoration: 'none',
+              })}>
+              {icon}
             </NavLink>
           ))}
         </div>
-        <div className="p-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--risk-low)' }} />
-            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Pipeline Active</span>
-          </div>
-          <p className="text-xs mt-1 opacity-40">FinHack 2026</p>
-        </div>
+        <div style={{ width: 6, height: 6, borderRadius: 3, background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
       </nav>
-
-      {/* Main content */}
-      <main className="flex-1 overflow-auto p-6 relative" style={{ background: 'var(--bg-primary)' }}>
+      <main className="flex-1 overflow-auto p-5 relative" style={{ background: 'var(--bg-primary)' }}>
         <Outlet />
       </main>
     </div>

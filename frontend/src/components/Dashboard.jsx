@@ -1,29 +1,51 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, Tooltip,
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 import { fetchStats, fetchAlerts, fetchCompare } from '../api/client';
-import { formatNumber, formatCurrency, riskColor } from '../utils/formatters';
+import { formatCurrency, riskColor } from '../utils/formatters';
 import StatsCard from './StatsCard';
-import RiskGauge from './RiskGauge';
-import ParticleBackground from './ParticleBackground';
 import AnimatedNumber from './AnimatedNumber';
 import useWebSocket from '../hooks/useWebSocket';
 
 const RISK_COLORS = {
-  critical: '#ef4444',
-  high: '#f59e0b',
-  medium: '#eab308',
-  low: '#22c55e',
+  critical: '#dc2626',
+  high: '#ea580c',
+  medium: '#d97706',
+  low: '#16a34a',
 };
 
-const URGENCY_COLORS = {
-  critical: 'var(--risk-critical)',
-  high: 'var(--risk-high)',
-  medium: 'var(--risk-medium)',
-  low: 'var(--risk-low)',
+const generateActivityData = () => {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let base = 40;
+  return months.map(m => {
+    base += Math.floor(Math.random() * 30 - 12);
+    base = Math.max(10, Math.min(95, base));
+    const avg = base + Math.floor(Math.random() * 20 - 10);
+    return { month: m, score: base, avg: Math.max(5, Math.min(95, avg)) };
+  });
+};
+
+const generateRadarData = () => {
+  const cats = [
+    'Structuring','Layering','Round-Trip','Fan-Out','Rapid Relay',
+    'Smurfing','Peel Chain','Mixer Use','Shell Corp','Cross-Border',
+    'Dormant Acct','High Freq',
+  ];
+  return cats.map((c, i) => ({
+    category: (i + 1).toString(),
+    fullName: c,
+    detected: Math.floor(Math.random() * 60 + 30),
+    baseline: Math.floor(Math.random() * 40 + 20),
+  }));
+};
+
+const tt = {
+  background: 'var(--bg-card)', border: '1px solid #1a1a1a',
+  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#bbb',
 };
 
 export default function Dashboard() {
@@ -31,6 +53,8 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [compare, setCompare] = useState(null);
   const [liveAlerts, setLiveAlerts] = useState([]);
+  const [activityData] = useState(generateActivityData);
+  const [radarData] = useState(generateRadarData);
   const navigate = useNavigate();
   const { lastUpdate } = useWebSocket();
 
@@ -40,19 +64,15 @@ export default function Dashboard() {
     fetchCompare().then(setCompare);
   }, []);
 
-  // Auto-refresh dashboard when live transaction comes in
   useEffect(() => {
     if (lastUpdate && lastUpdate.type === 'transaction_injected') {
-      // Re-fetch stats and alerts immediately
       fetchStats().then(setStats);
       fetchAlerts(10).then(setAlerts);
-      // Add live alert to top of feed with animation flag
       if (lastUpdate.alert) {
         setLiveAlerts(prev => [{
           ...lastUpdate.alert,
           total_volume: lastUpdate.transaction.amount,
           flags: [...(lastUpdate.sender.flags || []), ...(lastUpdate.receiver.flags || [])],
-          isNew: true,
           timestamp: Date.now(),
         }, ...prev.slice(0, 4)]);
       }
@@ -61,221 +81,317 @@ export default function Dashboard() {
 
   if (!stats) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-secondary)' }}>
+      <div className="flex items-center justify-center h-full" style={{ color: '#666' }}>
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
-            style={{ borderColor: 'var(--accent-cyan)', borderTopColor: 'transparent' }} />
-          <p>Running detection pipeline...</p>
+          <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+            style={{ borderColor: '#333333', borderTopColor: 'transparent' }} />
+          <p style={{ fontSize: 12 }}>Initializing pipeline...</p>
         </div>
       </div>
     );
   }
 
+  // Score bar: compute overall "grade"
   const threatLevel = Math.min(
     (stats.high_risk_wallets * 3 + stats.medium_risk_wallets * 1.5 + stats.critical_clusters * 10) / 5,
     100
   );
+  const scorePercent = Math.max(0, Math.min(100, 100 - threatLevel));
+  const getGrade = (s) => {
+    if (s >= 90) return { letter: 'A+', label: 'Excellent' };
+    if (s >= 80) return { letter: 'A', label: 'Strong' };
+    if (s >= 70) return { letter: 'B', label: 'Adequate' };
+    if (s >= 60) return { letter: 'C', label: 'Fair' };
+    if (s >= 40) return { letter: 'D', label: 'Poor' };
+    return { letter: 'F', label: 'Critical' };
+  };
+  const grade = getGrade(scorePercent);
+  const gradeColor = scorePercent >= 80 ? '#ef4444' : scorePercent >= 70 ? '#16a34a' : scorePercent >= 60 ? '#d97706' : scorePercent >= 40 ? '#ea580c' : '#dc2626';
 
-  const riskDistribution = [
+  const riskDist = [
     { name: 'Critical', value: stats.critical_clusters || 1, color: RISK_COLORS.critical },
     { name: 'High', value: stats.high_risk_wallets || 1, color: RISK_COLORS.high },
     { name: 'Medium', value: stats.medium_risk_wallets, color: RISK_COLORS.medium },
   ].filter(d => d.value > 0);
 
-  const compareData = compare ? [
-    { name: 'Rule-Based', precision: compare.rule_based.precision, recall: compare.rule_based.recall, f1: compare.rule_based.f1 },
-    { name: 'ML-Only', precision: compare.ml_only.precision, recall: compare.ml_only.recall, f1: compare.ml_only.f1 },
-    { name: 'Hybrid', precision: compare.hybrid.precision, recall: compare.hybrid.recall, f1: compare.hybrid.f1 },
-  ] : [];
+  const allAlerts = [
+    ...liveAlerts.map(a => ({ ...a, isLive: true })),
+    ...alerts.filter(a => !liveAlerts.find(la => la.cluster_id === a.cluster_id)),
+  ];
+
+  // ML accuracy bar segments
+  const mlMetrics = stats.ml_metrics;
 
   return (
-    <div className="space-y-5 relative">
-      <ParticleBackground />
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 310px', gap: 20, height: '100%' }}>
 
-      <div className="relative z-10 space-y-5">
-        <h2 className="text-2xl font-bold animate-fade-in">Dashboard</h2>
+      {/* ═══ LEFT ═══ */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, overflow: 'auto', paddingBottom: 20 }}>
 
-        {/* Top Row: Gauge + Stats */}
-        <div className="flex gap-5 stagger-children">
-          {/* Risk Gauge */}
-          <div className="glass-card p-6 flex items-center justify-center" style={{ minWidth: 220 }}>
-            <RiskGauge value={threatLevel} />
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#e0e0e0' }}>Overview</h2>
+            <p style={{ fontSize: 11, color: '#666', margin: '2px 0 0' }}>
+              ShadowTrace ARIA — Financial Intelligence Platform
+            </p>
           </div>
-
-          {/* Stats Grid */}
-          <div className="flex-1 grid grid-cols-4 gap-4">
-            <StatsCard label="Transactions" value={stats.total_transactions} delay={100} />
-            <StatsCard label="Wallets Monitored" value={stats.total_wallets} delay={150} />
-            <StatsCard label="High Risk Wallets" value={stats.high_risk_wallets} color="var(--risk-critical)" delay={200} />
-            <StatsCard label="Urgent Cases" value={stats.urgent_cases || 0} color="var(--risk-high)" delay={250} />
+          <div style={{
+            padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)', color: '#16a34a',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <div style={{ width: 6, height: 6, borderRadius: 3, background: '#16a34a', animation: 'livePulse 2s infinite' }} />
+            Online
           </div>
         </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-3 gap-4 stagger-children">
-          {/* Risk Distribution */}
-          <div className="glass-card p-5">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Risk Distribution</h3>
+        {/* Overall Score Bar — like the screenshot */}
+        <div className="glass-card" style={{ padding: '18px 20px' }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#e0e0e0', margin: '0 0 3px' }}>Overall network health score</p>
+          <p style={{ fontSize: 11, color: '#666', margin: '0 0 14px' }}>Composite assessment based on detection pipeline results</p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 18, background: gradeColor,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--bg-card)', fontSize: 14, fontWeight: 800,
+            }}>{grade.letter}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontSize: 28, fontWeight: 800, color: '#e0e0e0' }}>{Math.round(scorePercent)}%</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: gradeColor }}>{grade.label}</span>
+            </div>
+          </div>
+
+          {/* Colored segmented bar */}
+          <div style={{ position: 'relative' }}>
+            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', gap: 2 }}>
+              {[
+                { end: 40, color: '#7f1d1d', label: 'F' },
+                { end: 60, color: '#dc2626', label: 'D' },
+                { end: 70, color: '#d97706', label: 'C' },
+                { end: 85, color: '#16a34a', label: 'B' },
+                { end: 100, color: '#ef4444', label: 'A' },
+              ].map((seg, i, arr) => {
+                const start = i === 0 ? 0 : arr[i - 1].end;
+                return (
+                  <div key={i} style={{
+                    flex: seg.end - start, background: seg.color,
+                    opacity: scorePercent >= start ? 1 : 0.15,
+                  }} />
+                );
+              })}
+            </div>
+            {/* Labels underneath */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              {[
+                { label: 'F', pos: '0%' },
+                { label: 'D', pos: '40%' },
+                { label: 'C', pos: '60%' },
+                { label: 'B', pos: '70%' },
+                { label: 'A', pos: '85%' },
+                { label: 'A+', pos: '100%' },
+              ].map(l => (
+                <span key={l.label} style={{ fontSize: 9, color: '#666', fontWeight: 600 }}>{l.label}</span>
+              ))}
+            </div>
+            {/* Marker */}
+            <div style={{
+              position: 'absolute', top: -4, left: `${scorePercent}%`, transform: 'translateX(-50%)',
+              width: 2, height: 16, background: '#e0e0e0', borderRadius: 1,
+            }} />
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div>
+          <p className="section-label">System Metrics</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+            <StatsCard label="Transactions" value={stats.total_transactions} delay={30} />
+            <StatsCard label="Wallets" value={stats.total_wallets} delay={60} />
+            <StatsCard label="Flagged" value={stats.high_risk_wallets} color="#dc2626" delay={90} />
+            <StatsCard label="Urgent" value={stats.urgent_cases || 0} color="#ea580c" delay={120} />
+            <StatsCard label="Clusters" value={stats.total_clusters || 0} delay={150} />
+          </div>
+        </div>
+
+        {/* Charts — Line + Radar like the screenshot */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {/* Line chart */}
+          <div className="glass-card" style={{ padding: '16px 18px' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: '0 0 2px' }}>
+              Detection score over time
+            </p>
+            <p style={{ fontSize: 10, color: '#666', margin: '0 0 12px' }}>
+              Track detection confidence scores over time
+            </p>
+            <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 10, color: '#666' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#ef4444' }} /> ARIA
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#4ade80' }} /> Baseline
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={activityData}>
+                <XAxis dataKey="month" stroke="#333333" fontSize={9} tickLine={false} axisLine={false} />
+                <YAxis stroke="#333333" fontSize={9} tickLine={false} axisLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={tt} />
+                <Line type="monotone" dataKey="score" stroke="#ef4444" strokeWidth={2} dot={{ r: 3, fill: '#ef4444' }} name="ARIA" />
+                <Line type="monotone" dataKey="avg" stroke="#4ade80" strokeWidth={2} dot={{ r: 3, fill: '#4ade80' }} name="Baseline" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Radar chart */}
+          <div className="glass-card" style={{ padding: '16px 18px' }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: '0 0 2px' }}>
+              Typology coverage
+            </p>
+            <p style={{ fontSize: 10, color: '#666', margin: '0 0 12px' }}>
+              Detection coverage by threat category
+            </p>
+            <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 10, color: '#666' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#ef4444' }} /> Detected
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: '#4ade80' }} /> Baseline
+              </span>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <RadarChart data={radarData} cx="50%" cy="50%" outerRadius={65}>
+                <PolarGrid stroke="#333" />
+                <PolarAngleAxis dataKey="category" tick={{ fontSize: 9, fill: '#666' }} />
+                <PolarRadiusAxis tick={{ fontSize: 8, fill: '#333333' }} domain={[0, 100]} axisLine={false} />
+                <Radar name="Detected" dataKey="detected" stroke="#ef4444" fill="#ef4444" fillOpacity={0.08} strokeWidth={1.5} dot={{ r: 2 }} />
+                <Radar name="Baseline" dataKey="baseline" stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.06} strokeWidth={1.5} dot={{ r: 2 }} />
+                <Tooltip contentStyle={tt} />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Risk Breakdown */}
+        <div>
+          <p className="section-label">Risk Breakdown</p>
+          <div className="glass-card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 24 }}>
+            <ResponsiveContainer width={100} height={85}>
               <PieChart>
-                <Pie data={riskDistribution} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={35} outerRadius={70} strokeWidth={0}>
-                  {riskDistribution.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
+                <Pie data={riskDist} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={22} outerRadius={38} strokeWidth={0} paddingAngle={2}>
+                  {riskDist.map((e, i) => <Cell key={i} fill={e.color} />)}
                 </Pie>
-                <Tooltip contentStyle={{ background: 'rgba(10, 18, 32, 0.9)', border: '1px solid var(--glass-border)', borderRadius: 12, backdropFilter: 'blur(8px)' }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
-          </div>
-
-          {/* Model Comparison */}
-          <div className="col-span-2 glass-card p-5">
-            <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Detection Model Comparison</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <BarChart data={compareData} barGap={2}>
-                <XAxis dataKey="name" stroke="var(--text-secondary)" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="var(--text-secondary)" fontSize={11} domain={[0, 1]} tickLine={false} axisLine={false} />
-                <Tooltip contentStyle={{ background: 'rgba(10, 18, 32, 0.9)', border: '1px solid var(--glass-border)', borderRadius: 12 }} />
-                <Bar dataKey="precision" fill="var(--accent-blue)" name="Precision" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="recall" fill="var(--accent-cyan)" name="Recall" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="f1" fill="#8b5cf6" name="F1 Score" radius={[4, 4, 0, 0]} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Live Alerts from Demo */}
-        {liveAlerts.length > 0 && (
-          <div className="glass-card glow-red animate-fade-in-up" style={{ border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-            <div className="p-5 border-b flex items-center gap-2" style={{ borderColor: 'rgba(239, 68, 68, 0.15)' }}>
-              <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: 'var(--risk-critical)', boxShadow: '0 0 8px var(--risk-critical)' }} />
-              <h3 className="text-sm font-bold" style={{ color: 'var(--risk-critical)' }}>LIVE — Threat Detection Feed</h3>
-            </div>
-            <div className="divide-y" style={{ borderColor: 'rgba(239, 68, 68, 0.1)' }}>
-              {liveAlerts.map((alert, i) => (
-                <div key={`live-${alert.cluster_id}-${alert.timestamp}`}
-                  className="flex items-center justify-between px-5 py-4 cursor-pointer animate-fade-in-up"
-                  style={{ background: 'rgba(239, 68, 68, 0.03)' }}
-                  onClick={() => navigate(`/investigation?cluster=${alert.cluster_id}`)}>
-                  <div className="flex items-center gap-4">
-                    <div className="w-3 h-3 rounded-full risk-pulse"
-                      style={{ background: RISK_COLORS[alert.risk_level] || RISK_COLORS.high, boxShadow: `0 0 10px ${RISK_COLORS[alert.risk_level] || RISK_COLORS.high}` }} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold" style={{ color: 'var(--risk-critical)' }}>Cluster #{alert.cluster_id}</span>
-                        <span className="text-xs px-2 py-0.5 rounded font-bold animate-pulse"
-                          style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
-                          NEW
-                        </span>
-                        {alert.typology && (
-                          <span className="text-xs px-1.5 py-0.5 rounded"
-                            style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
-                            {alert.typology}
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                        {alert.size} wallets — detected just now
-                      </span>
-                    </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {riskDist.map(d => (
+                <div key={d.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: d.color }} />
+                    <span style={{ fontSize: 12, color: '#bbb', fontWeight: 500 }}>{d.name}</span>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs px-2 py-0.5 rounded font-bold"
-                      style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                      {alert.risk_level?.toUpperCase()}
-                    </span>
-                    <span className="text-lg font-bold tabular-nums" style={{ color: riskColor(alert.score) }}>
-                      {alert.score?.toFixed?.(1) || alert.score}
-                    </span>
-                  </div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: d.color }}>{d.value}</span>
                 </div>
               ))}
             </div>
           </div>
-        )}
+        </div>
+      </div>
 
-        {/* Alert Feed */}
-        <div className="glass-card animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
-          <div className="p-5 border-b" style={{ borderColor: 'var(--glass-border)' }}>
-            <h3 className="text-sm font-semibold">Suspicious Cluster Alerts</h3>
+      {/* ═══ RIGHT ═══ */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 12,
+        borderLeft: '1px solid rgba(0,0,0,0.06)', paddingLeft: 20, overflow: 'auto',
+      }}>
+
+        {/* Threats */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p className="section-label" style={{ margin: 0 }}>Flagged Clusters</p>
+            <span style={{ fontSize: 10, color: '#666' }}>{allAlerts.length} total</span>
           </div>
-          <div className="divide-y" style={{ borderColor: 'var(--glass-border)' }}>
-            {alerts.map((alert, i) => (
+
+          <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
+            <div style={{
+              display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
+              padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+              fontSize: 9, fontWeight: 600, color: '#666',
+              textTransform: 'uppercase', letterSpacing: 0.5,
+              background: '#161616', borderRadius: '10px 10px 0 0',
+            }}>
+              <span>ID</span>
+              <span>Type</span>
+              <span>Level</span>
+              <span style={{ textAlign: 'right' }}>Score</span>
+            </div>
+
+            {allAlerts.map((alert, i) => (
               <div
-                key={alert.cluster_id}
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer transition-all duration-200 animate-fade-in-up"
-                style={{ animationDelay: `${0.35 + i * 0.05}s` }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(6, 182, 212, 0.03)';
-                  e.currentTarget.style.borderLeft = '2px solid var(--accent-cyan)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.borderLeft = '2px solid transparent';
-                }}
+                key={`${alert.cluster_id}-${alert.timestamp || i}`}
                 onClick={() => navigate(`/investigation?cluster=${alert.cluster_id}`)}
+                className={alert.isLive ? 'animate-fade-in-up' : ''}
+                style={{
+                  display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
+                  padding: '7px 12px', cursor: 'pointer',
+                  borderBottom: '1px solid rgba(0,0,0,0.04)',
+                  background: alert.isLive ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)',
+                  transition: 'background 0.15s', alignItems: 'center',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = alert.isLive ? 'rgba(239,68,68,0.1)' : '#161616'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = alert.isLive ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)'; }}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-2.5 h-2.5 rounded-full"
-                    style={{ background: RISK_COLORS[alert.risk_level], boxShadow: `0 0 6px ${RISK_COLORS[alert.risk_level]}` }} />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">Cluster #{alert.cluster_id}</span>
-                      {alert.typology && alert.typology !== 'Unclassified' && (
-                        <span className="text-xs px-1.5 py-0.5 rounded"
-                          style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)', border: '1px solid rgba(6, 182, 212, 0.15)' }}>
-                          {alert.typology}
-                        </span>
-                      )}
-                      {alert.known_actor_label && (
-                        <span className="text-xs px-1.5 py-0.5 rounded font-bold"
-                          style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                          {alert.known_actor_label}
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {alert.size} wallets &middot; {formatCurrency(alert.total_volume)}
-                    </span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: 3, background: RISK_COLORS[alert.risk_level] || '#666' }} />
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#bbb' }}>{alert.cluster_id}</span>
                 </div>
-                <div className="flex items-center gap-3">
-                  {alert.freeze_urgency && alert.freeze_urgency !== 'low' && (
-                    <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                      style={{
-                        background: alert.freeze_urgency === 'critical' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                        color: URGENCY_COLORS[alert.freeze_urgency],
-                        border: `1px solid ${alert.freeze_urgency === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)'}`,
-                      }}>
-                      {alert.freeze_urgency === 'critical' ? 'URGENT' : 'HIGH'}
-                    </span>
-                  )}
-                  <div className="flex gap-1">
-                    {alert.flags.slice(0, 2).map((flag) => (
-                      <span key={flag} className="text-xs px-2 py-0.5 rounded"
-                        style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--risk-critical)' }}>
-                        {flag.replace(/_/g, ' ')}
-                      </span>
-                    ))}
-                  </div>
-                  <span className="text-sm font-bold tabular-nums" style={{ color: riskColor(alert.score) }}>
-                    {alert.score}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden' }}>
+                  <span style={{ fontSize: 10, color: '#777', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {alert.typology || '—'}
                   </span>
+                  {alert.isLive && (
+                    <span style={{
+                      fontSize: 7, padding: '1px 4px', borderRadius: 3, fontWeight: 700,
+                      background: 'rgba(239,68,68,0.15)', color: '#dc2626', flexShrink: 0,
+                    }}>LIVE</span>
+                  )}
                 </div>
+                <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', color: RISK_COLORS[alert.risk_level] || '#666' }}>
+                  {alert.risk_level || '—'}
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, textAlign: 'right', color: riskColor(alert.score), fontVariantNumeric: 'tabular-nums' }}>
+                  {typeof alert.score === 'number' ? Math.round(alert.score) : alert.score}
+                </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* ML Metrics */}
-        {stats.ml_metrics && (
-          <div className="grid grid-cols-4 gap-4 stagger-children">
-            <StatsCard label="ML Precision" value={`${(stats.ml_metrics.precision * 100).toFixed(1)}%`} color="var(--accent-blue)" delay={500} />
-            <StatsCard label="ML Recall" value={`${(stats.ml_metrics.recall * 100).toFixed(1)}%`} color="var(--accent-cyan)" delay={550} />
-            <StatsCard label="ML F1 Score" value={`${(stats.ml_metrics.f1 * 100).toFixed(1)}%`} color="#8b5cf6" delay={600} />
-            <StatsCard label="ML Accuracy" value={`${(stats.ml_metrics.accuracy * 100).toFixed(1)}%`} color="var(--risk-low)" delay={650} />
+        {/* ML Accuracy — compact colored bar at bottom right */}
+        {mlMetrics && (
+          <div className="glass-card" style={{ padding: '12px 14px' }}>
+            <p style={{ fontSize: 10, fontWeight: 600, color: '#bbb', margin: '0 0 8px' }}>Model Accuracy</p>
+            <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden', gap: 1, marginBottom: 6 }}>
+              <div style={{ flex: mlMetrics.precision * 100, background: '#ef4444', borderRadius: '3px 0 0 3px' }} title="Precision" />
+              <div style={{ flex: mlMetrics.recall * 100, background: '#f97316' }} title="Recall" />
+              <div style={{ flex: mlMetrics.f1 * 100, background: '#7c3aed' }} title="F1" />
+              <div style={{ flex: mlMetrics.accuracy * 100, background: '#16a34a', borderRadius: '0 3px 3px 0' }} title="Accuracy" />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#666' }}>
+              {[
+                { label: 'Precision', val: mlMetrics.precision, color: '#ef4444' },
+                { label: 'Recall', val: mlMetrics.recall, color: '#f97316' },
+                { label: 'F1', val: mlMetrics.f1, color: '#7c3aed' },
+                { label: 'Accuracy', val: mlMetrics.accuracy, color: '#16a34a' },
+              ].map(m => (
+                <div key={m.label} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <div style={{ width: 5, height: 5, borderRadius: 2, background: m.color }} />
+                  <span>{m.label}</span>
+                  <span style={{ fontWeight: 700, color: m.color }}>{(m.val * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

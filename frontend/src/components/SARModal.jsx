@@ -12,55 +12,72 @@ export default function SARModal({ sar, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay"
       onClick={onClose}>
-      <div className="w-[820px] max-h-[85vh] glass-card flex flex-col animate-modal-in glow-cyan"
-        style={{ background: 'rgba(8, 14, 28, 0.85)', backdropFilter: 'blur(20px)' }}
-        onClick={(e) => e.stopPropagation()}>
+      <div className="animate-modal-in"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 780, maxHeight: '85vh', display: 'flex', flexDirection: 'column',
+          background: 'var(--bg-card)', borderRadius: 12, border: '1px solid #1a1a1a',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        }}>
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b" style={{ borderColor: 'var(--glass-border)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', borderBottom: '1px solid #222222',
+        }}>
           <div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--risk-critical)' }} />
-              <h2 className="text-lg font-bold">Suspicious Activity Report</h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 7, height: 7, borderRadius: 4, background: '#dc2626' }} />
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>
+                Suspicious Activity Report
+              </h2>
             </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-              Cluster #{sar.cluster_id} &middot; Generated {sar.generated_by === 'ai' ? 'by AI' : 'from template'}
+            <p style={{ fontSize: 10, color: '#666', margin: '3px 0 0' }}>
+              Cluster #{sar.cluster_id} · Generated {sar.generated_by === 'ai' ? 'by AI' : 'from template'}
               {sar.model && ` (${sar.model})`}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button onClick={handleCopy}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200"
               style={{
-                border: `1px solid ${copied ? 'var(--risk-low)' : 'var(--glass-border)'}`,
-                color: copied ? 'var(--risk-low)' : 'var(--text-primary)',
-                background: copied ? 'rgba(34, 197, 94, 0.08)' : 'transparent',
-                boxShadow: copied ? '0 0 12px rgba(34, 197, 94, 0.15)' : 'none',
+                padding: '6px 14px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+                border: `1px solid ${copied ? 'rgba(34,197,94,0.15)' : '#1a1a1a'}`,
+                background: copied ? 'rgba(34,197,94,0.08)' : '#fff',
+                color: copied ? '#16a34a' : '#bbb',
+                cursor: 'pointer',
               }}>
               {copied ? 'Copied' : 'Copy Report'}
             </button>
             <button onClick={onClose}
-              className="px-3 py-1.5 rounded-lg text-sm transition-opacity hover:opacity-80"
-              style={{ color: 'var(--text-secondary)' }}>
+              style={{
+                padding: '6px 12px', borderRadius: 6, fontSize: 11,
+                border: '1px solid #1a1a1a', background: 'var(--bg-card)',
+                color: '#666', cursor: 'pointer',
+              }}>
               Close
             </button>
           </div>
         </div>
 
-        {/* SAR Content */}
-        <div className="flex-1 overflow-y-auto p-6 animate-fade-in" style={{ animationDelay: '0.15s' }}>
-          <pre className="whitespace-pre-wrap text-sm leading-relaxed font-mono"
-            style={{ color: 'var(--text-primary)' }}>
+        {/* Content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '20px 24px' }}>
+          <pre style={{
+            whiteSpace: 'pre-wrap', fontSize: 12, lineHeight: 1.7,
+            fontFamily: "'SF Mono', 'Fira Code', monospace",
+            color: '#bbb', margin: 0,
+          }}>
             {sar.sar_narrative}
           </pre>
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t flex items-center justify-between"
-          style={{ borderColor: 'var(--glass-border)' }}>
-          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+        <div style={{
+          padding: '10px 20px', borderTop: '1px solid #222222',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span style={{ fontSize: 10, color: '#666' }}>
             ShadowTrace Financial Intelligence Platform
           </span>
-          <span className="text-xs font-mono" style={{ color: 'var(--accent-cyan)', opacity: 0.5 }}>
+          <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#dc2626', fontWeight: 600, letterSpacing: 1 }}>
             CONFIDENTIAL
           </span>
         </div>

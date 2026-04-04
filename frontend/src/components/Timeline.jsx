@@ -5,6 +5,11 @@ import {
 import { fetchAlerts, fetchTimeline } from '../api/client';
 import { truncateAddress, formatCurrency } from '../utils/formatters';
 
+const tt = {
+  background: 'var(--bg-card)', border: '1px solid #1a1a1a',
+  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#bbb',
+};
+
 export default function Timeline() {
   const [alerts, setAlerts] = useState([]);
   const [selectedCluster, setSelectedCluster] = useState(null);
@@ -48,12 +53,21 @@ export default function Timeline() {
   const visibleTxns = timelineData.slice(0, currentIndex || timelineData.length);
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Timeline Analysis</h2>
-        <select className="text-sm px-3 py-1.5 rounded-lg border"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-          value={selectedCluster || ''} onChange={(e) => loadTimeline(Number(e.target.value))}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#e0e0e0' }}>Timeline Analysis</h2>
+          <p style={{ fontSize: 11, color: '#666', margin: '2px 0 0' }}>Temporal fund flow visualization</p>
+        </div>
+        <select
+          value={selectedCluster || ''}
+          onChange={(e) => loadTimeline(Number(e.target.value))}
+          style={{
+            fontSize: 12, padding: '6px 12px', borderRadius: 6,
+            background: 'var(--bg-card)', border: '1px solid #1a1a1a', color: '#bbb',
+            outline: 'none', cursor: 'pointer',
+          }}>
           {alerts.map((a) => (
             <option key={a.cluster_id} value={a.cluster_id}>
               Cluster #{a.cluster_id} — Score: {a.score}
@@ -62,70 +76,104 @@ export default function Timeline() {
         </select>
       </div>
 
-      <div className="flex items-center gap-4 rounded-xl p-4 border"
-        className="glass-card-static">
+      {/* Controls */}
+      <div className="glass-card" style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button onClick={() => {
           if (currentIndex >= timelineData.length) setCurrentIndex(0);
           setPlaying(!playing);
-        }} className="px-4 py-2 rounded-lg text-sm font-semibold"
-          style={{ background: 'var(--accent-cyan)', color: '#000' }}>
+        }} style={{
+          padding: '6px 16px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+          border: 'none', cursor: 'pointer',
+          background: playing ? '#222222' : '#ef4444', color: playing ? '#bbb' : '#fff',
+        }}>
           {playing ? 'Pause' : currentIndex >= timelineData.length ? 'Replay' : 'Play'}
         </button>
         <button onClick={() => { setCurrentIndex(0); setPlaying(false); }}
-          className="px-3 py-2 rounded-lg text-sm border"
-          style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>Reset</button>
-        <div className="flex-1">
+          style={{
+            padding: '6px 12px', borderRadius: 6, fontSize: 12,
+            border: '1px solid #1a1a1a', background: 'var(--bg-card)', color: '#666', cursor: 'pointer',
+          }}>Reset</button>
+        <div style={{ flex: 1 }}>
           <input type="range" min={0} max={timelineData.length}
             value={currentIndex || timelineData.length}
             onChange={(e) => { setPlaying(false); setCurrentIndex(Number(e.target.value)); }}
-            className="w-full" />
+            style={{ width: '100%' }} />
         </div>
-        <span className="text-xs font-mono" style={{ color: 'var(--text-secondary)' }}>
-          {currentIndex || timelineData.length} / {timelineData.length} txns
+        <span style={{ fontSize: 11, color: '#666', fontFamily: 'monospace' }}>
+          {currentIndex || timelineData.length} / {timelineData.length}
         </span>
       </div>
 
-      <div className="rounded-xl p-5 border" className="glass-card-static">
-        <h3 className="text-sm font-semibold mb-3">Cumulative Fund Flow</h3>
+      {/* Chart */}
+      <div className="glass-card" style={{ padding: '16px 18px' }}>
+        <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: '0 0 2px' }}>Cumulative Fund Flow</p>
+        <p style={{ fontSize: 10, color: '#666', margin: '0 0 12px' }}>Track total volume and individual transaction amounts</p>
+        <div style={{ display: 'flex', gap: 14, marginBottom: 8, fontSize: 10, color: '#666' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: '#ef4444' }} /> Cumulative
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: '#4ade80' }} /> Per-Txn
+          </span>
+        </div>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={cumulativeData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="index" stroke="var(--text-secondary)" fontSize={11} />
-            <YAxis stroke="var(--text-secondary)" fontSize={11} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} />
-            <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}
-              formatter={(value) => [formatCurrency(value)]}
+            <CartesianGrid strokeDasharray="3 3" stroke="#222222" />
+            <XAxis dataKey="index" stroke="#333333" fontSize={10} tickLine={false} axisLine={false} />
+            <YAxis stroke="#333333" fontSize={10} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={tt} formatter={(value) => [formatCurrency(value)]}
               labelFormatter={(i) => cumulativeData[i]?.timestamp || ''} />
-            <Line type="monotone" dataKey="cumulative" stroke="var(--accent-cyan)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="amount" stroke="var(--accent-blue)" strokeWidth={1} dot={{ r: 2 }} />
+            <Line type="monotone" dataKey="cumulative" stroke="#ef4444" strokeWidth={2} dot={false} name="Cumulative" />
+            <Line type="monotone" dataKey="amount" stroke="#4ade80" strokeWidth={1.5} dot={{ r: 2, fill: '#4ade80' }} name="Amount" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="flex-1 rounded-xl border overflow-y-auto"
-        className="glass-card-static">
-        <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
-          <h3 className="text-sm font-semibold">Transaction Flow</h3>
+      {/* Transaction flow table */}
+      <div className="glass-card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>Transaction Flow</p>
+          <span style={{ fontSize: 10, color: '#666' }}>{visibleTxns.length} transactions</span>
         </div>
-        <div className="p-4 space-y-2">
-          {visibleTxns.map((tx, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-lg text-xs"
-              style={{
-                background: i === (currentIndex || timelineData.length) - 1 ? 'rgba(6, 182, 212, 0.1)' : 'var(--bg-secondary)',
-                border: i === (currentIndex || timelineData.length) - 1 ? '1px solid var(--accent-cyan)' : '1px solid transparent',
+
+        {/* Table header */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '36px 1fr 20px 1fr 90px 80px',
+          padding: '6px 16px', fontSize: 9, fontWeight: 600, color: '#666',
+          textTransform: 'uppercase', letterSpacing: 0.5, background: '#161616',
+          borderBottom: '1px solid rgba(0,0,0,0.04)',
+        }}>
+          <span>#</span><span>From</span><span></span><span>To</span>
+          <span style={{ textAlign: 'right' }}>Amount</span><span style={{ textAlign: 'right' }}>Pattern</span>
+        </div>
+
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          {visibleTxns.map((tx, i) => {
+            const isActive = i === (currentIndex || timelineData.length) - 1;
+            return (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '36px 1fr 20px 1fr 90px 80px',
+                padding: '7px 16px', fontSize: 11, alignItems: 'center',
+                borderBottom: '1px solid rgba(0,0,0,0.03)',
+                background: isActive ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)',
+                borderLeft: isActive ? '2px solid #ef4444' : '2px solid transparent',
               }}>
-              <span className="font-mono w-6 text-center" style={{ color: 'var(--text-secondary)' }}>{i + 1}</span>
-              <span className="font-mono" style={{ color: 'var(--accent-blue)' }}>{truncateAddress(tx.from)}</span>
-              <span style={{ color: 'var(--text-secondary)' }}>→</span>
-              <span className="font-mono" style={{ color: 'var(--accent-cyan)' }}>{truncateAddress(tx.to)}</span>
-              <span className="font-mono font-semibold ml-auto">{formatCurrency(tx.amount)}</span>
-              {tx.pattern_type && (
-                <span className="px-1.5 py-0.5 rounded"
-                  style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)' }}>
-                  {tx.pattern_type}
+                <span style={{ color: '#666', fontFamily: 'monospace', fontSize: 10 }}>{i + 1}</span>
+                <span style={{ fontFamily: 'monospace', color: '#bbb', fontSize: 10 }}>{truncateAddress(tx.from)}</span>
+                <span style={{ color: '#333333' }}>→</span>
+                <span style={{ fontFamily: 'monospace', color: '#bbb', fontSize: 10 }}>{truncateAddress(tx.to)}</span>
+                <span style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: '#e0e0e0', fontSize: 11 }}>{formatCurrency(tx.amount)}</span>
+                <span style={{ textAlign: 'right' }}>
+                  {tx.pattern_type && (
+                    <span style={{
+                      fontSize: 9, padding: '2px 6px', borderRadius: 4,
+                      background: 'rgba(239,68,68,0.06)', color: '#dc2626', fontWeight: 600,
+                    }}>{tx.pattern_type}</span>
+                  )}
                 </span>
-              )}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -22,32 +22,44 @@ export default function LiveToast({ update, onDismiss }) {
 
   return (
     <div
-      className="fixed top-5 right-5 z-50 max-w-md transition-all duration-300"
+      className="fixed top-4 right-4 z-50 max-w-sm transition-all duration-300"
       style={{
         opacity: visible ? 1 : 0,
-        transform: visible ? 'translateX(0)' : 'translateX(20px)',
+        transform: visible ? 'translateX(0)' : 'translateX(8px)',
       }}
     >
-      <div className="glass-card p-4 glow-cyan" style={{ background: 'rgba(8, 14, 28, 0.9)', backdropFilter: 'blur(20px)' }}>
-        <div className="flex items-start gap-3">
-          <div className="w-2 h-2 rounded-full mt-1.5 animate-pulse"
-            style={{ background: alert ? 'var(--risk-critical)' : 'var(--accent-cyan)', boxShadow: `0 0 8px ${alert ? 'var(--risk-critical)' : 'var(--accent-cyan)'}` }} />
-          <div className="flex-1">
-            <p className="text-sm font-semibold">
-              {alert ? 'Suspicious Activity Detected' : 'New Transaction'}
+      <div style={{
+        background: 'var(--bg-card)',
+        border: `1px solid ${alert ? 'rgba(239,68,68,0.15)' : '#1a1a1a'}`,
+        borderRadius: 10,
+        padding: '12px 14px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: 4, marginTop: 4, flexShrink: 0,
+            background: alert ? '#dc2626' : '#16a34a',
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, color: alert ? '#dc2626' : '#e0e0e0' }}>
+              {alert ? 'Threat Detected' : 'New Transaction'}
             </p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: 11, margin: '3px 0 0', color: '#666' }}>
               {truncateAddress(tx.from_address)} → {truncateAddress(tx.to_address)} · {formatCurrency(tx.amount)}
             </p>
             {alert && (
-              <div className="mt-2 flex gap-2">
-                <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                  style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <span style={{
+                  fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
+                  background: 'rgba(239,68,68,0.06)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.15)',
+                }}>
                   Cluster #{alert.cluster_id} · {alert.risk_level.toUpperCase()}
                 </span>
                 {alert.typology && alert.typology !== 'Unclassified' && (
-                  <span className="text-xs px-2 py-0.5 rounded"
-                    style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)', border: '1px solid rgba(6, 182, 212, 0.15)' }}>
+                  <span style={{
+                    fontSize: 10, padding: '2px 8px', borderRadius: 4,
+                    background: 'rgba(8,145,178,0.08)', color: '#0891b2', border: '1px solid rgba(8,145,178,0.15)',
+                  }}>
                     {alert.typology}
                   </span>
                 )}
@@ -55,8 +67,11 @@ export default function LiveToast({ update, onDismiss }) {
             )}
           </div>
           <button onClick={() => { setVisible(false); onDismiss(); }}
-            className="text-xs opacity-50 hover:opacity-80" style={{ color: 'var(--text-secondary)' }}>
-            &times;
+            style={{
+              fontSize: 16, border: 'none', background: 'none', cursor: 'pointer',
+              color: '#666', padding: 0, lineHeight: 1,
+            }}>
+            ×
           </button>
         </div>
       </div>

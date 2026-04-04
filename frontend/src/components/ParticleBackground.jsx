@@ -16,29 +16,26 @@ export default function ParticleBackground() {
     resize();
     window.addEventListener('resize', resize);
 
-    // Initialize particles
-    const count = 60;
+    const count = 40;
     for (let i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        radius: Math.random() * 1.5 + 0.5,
-        opacity: Math.random() * 0.3 + 0.1,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        radius: Math.random() * 1.2 + 0.3,
+        opacity: Math.random() * 0.15 + 0.05,
       });
     }
 
-    const maxDist = 150;
+    const maxDist = 120;
 
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Update and draw particles
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
-
         if (p.x < 0) p.x = canvas.width;
         if (p.x > canvas.width) p.x = 0;
         if (p.y < 0) p.y = canvas.height;
@@ -50,20 +47,18 @@ export default function ParticleBackground() {
         ctx.fill();
       });
 
-      // Draw connections
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const dx = particles[i].x - particles[j].x;
           const dy = particles[i].y - particles[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-
           if (dist < maxDist) {
-            const alpha = (1 - dist / maxDist) * 0.08;
+            const alpha = (1 - dist / maxDist) * 0.04;
             ctx.beginPath();
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.strokeStyle = `rgba(6, 182, 212, ${alpha})`;
-            ctx.lineWidth = 0.5;
+            ctx.lineWidth = 0.4;
             ctx.stroke();
           }
         }
@@ -73,7 +68,6 @@ export default function ParticleBackground() {
     };
 
     animate();
-
     return () => {
       cancelAnimationFrame(animationId);
       window.removeEventListener('resize', resize);
@@ -84,7 +78,7 @@ export default function ParticleBackground() {
     <canvas
       ref={canvasRef}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 0, opacity: 0.6 }}
+      style={{ zIndex: 0, opacity: 0.4 }}
     />
   );
 }
