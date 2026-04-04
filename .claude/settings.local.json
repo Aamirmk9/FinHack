@@ -24,7 +24,10 @@
       "Bash(echo \"Server PID: $!\")",
       "Bash(tasklist)",
       "Bash(python:*)",
-      "Bash(curl -s http://localhost:8000/api/alerts?limit=100)"
+      "Bash(curl -s http://localhost:8000/api/alerts?limit=100)",
+      "Bash(wc -l /home/mustafa/src/finhack/FinHack/frontend/src/components/*.jsx)",
+      "Bash(pip3 list:*)",
+      "Bash(python3:*)"
     ]
   },
   "enabledPlugins": {
