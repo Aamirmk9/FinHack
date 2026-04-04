@@ -23,8 +23,11 @@ const SHELL_RADII = {
 
 const RISK_LEVELS = ['low', 'medium', 'high', 'critical'];
 
-// Assign risk levels by rank so each quartile gets exactly ~25% of nodes,
-// regardless of score ties at boundaries.
+const EMPTY_GRAPH = { nodes: [], links: [] };
+
+const ZOOM_CLOSE = 120;
+const ZOOM_FAR = 550;
+
 function assignRiskLevels(nodes) {
   const indexed = nodes.map((n, i) => ({ i, score: n.score }));
   indexed.sort((a, b) => a.score - b.score);
@@ -38,11 +41,12 @@ function assignRiskLevels(nodes) {
 }
 
 export default function NetworkGraph() {
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [graphData, setGraphData] = useState(EMPTY_GRAPH);
   const [selectedNode, setSelectedNode] = useState(null);
   const [walletDetail, setWalletDetail] = useState(null);
-  const [minScore, setMinScore] = useState(0);
+  const [riskLevel, setRiskLevel] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [forcesReady, setForcesReady] = useState(false);
   const graphRef = useRef();
   const containerRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -51,12 +55,11 @@ export default function NetworkGraph() {
   const [newNodeIds, setNewNodeIds] = useState(new Set());
   const newNodeTimers = useRef({});
 
-  // Auto-refresh when a live transaction is injected + track new nodes
+  // Auto-refresh when a live transaction is injected
   useEffect(() => {
     if (lastUpdate && lastUpdate.type === 'transaction_injected') {
       const injectedIds = [lastUpdate.sender?.address, lastUpdate.receiver?.address].filter(Boolean);
       setNewNodeIds(prev => new Set([...prev, ...injectedIds]));
-      // Clear glow after 30s
       injectedIds.forEach(id => {
         if (newNodeTimers.current[id]) clearTimeout(newNodeTimers.current[id]);
         newNodeTimers.current[id] = setTimeout(() => {
@@ -71,23 +74,32 @@ export default function NetworkGraph() {
     }
   }, [lastUpdate]);
 
+  // Measure container — use hard calc height as fallback
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        });
+        const w = containerRef.current.offsetWidth;
+        const h = containerRef.current.offsetHeight;
+        if (w > 0 && h > 0) {
+          setDimensions({ width: w, height: h });
+        }
       }
     };
     updateSize();
+    requestAnimationFrame(updateSize);
+    // Also retry after a short delay for client-side navigation
+    const t = setTimeout(updateSize, 200);
     window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', updateSize);
+    };
   }, []);
 
+  // Fetch data
   useEffect(() => {
     setLoading(true);
-    fetchNetwork(minScore, 400).then((data) => {
+    fetchNetwork(0, 400).then((data) => {
       const levels = assignRiskLevels(data.nodes);
       setGraphData({
         nodes: data.nodes.map((n, i) => ({
@@ -105,43 +117,70 @@ export default function NetworkGraph() {
       });
       setLoading(false);
     });
-  }, [minScore, refreshKey]);
+  }, [refreshKey]);
 
-  // Auto-rotate + radial shell forces
+  // Setup forces ONCE when graph ref becomes available and data is loaded.
+  // Uses a polling approach since ForceGraph3D needs a frame to initialize internally.
   useEffect(() => {
-    if (!loading && graphRef.current) {
-      const controls = graphRef.current.controls();
-      if (controls) {
-        controls.autoRotate = true;
-        controls.autoRotateSpeed = 0.5;
+    if (loading || forcesReady) return;
+
+    const setup = () => {
+      const fg = graphRef.current;
+      if (!fg) return false;
+
+      try {
+        const controls = fg.controls();
+        if (controls) {
+          controls.autoRotate = true;
+          controls.autoRotateSpeed = 0.5;
+        }
+
+        fg.cameraPosition({ z: ZOOM_CLOSE });
+
+        const radial = forceRadial((node) => SHELL_RADII[node.riskLevel] || 120)
+          .strength(0.3);
+        fg.d3Force('radial', radial);
+
+        const charge = fg.d3Force('charge');
+        if (charge) {
+          charge.strength(-30);
+          charge.distanceMax(100);
+        }
+
+        const link = fg.d3Force('link');
+        if (link) {
+          link.distance(30);
+          link.strength(0.2);
+        }
+
+        fg.d3Force('center', null);
+        fg.d3ReheatSimulation();
+
+        setForcesReady(true);
+        return true;
+      } catch {
+        return false;
       }
-      graphRef.current.cameraPosition({ z: 500 });
+    };
 
-      // Radial force — pulls each node to its risk-level shell
-      const radial = forceRadial((node) => SHELL_RADII[node.riskLevel] || 120)
-        .strength(0.3);
-      graphRef.current.d3Force('radial', radial);
-
-      // Limit charge repulsion to nearby nodes so shells don't fight each other
-      const charge = graphRef.current.d3Force('charge');
-      if (charge) {
-        charge.strength(-30);
-        charge.distanceMax(100);
-      }
-
-      // Weaken links so they don't drag nodes across shells
-      const link = graphRef.current.d3Force('link');
-      if (link) {
-        link.distance(30);
-        link.strength(0.2);
-      }
-
-      // Remove centering force — radial force handles positioning
-      graphRef.current.d3Force('center', null);
-
-      graphRef.current.d3ReheatSimulation();
+    // Try immediately, then retry every 100ms until ForceGraph3D is ready
+    if (!setup()) {
+      const id = setInterval(() => {
+        if (setup()) clearInterval(id);
+      }, 100);
+      // Safety timeout
+      const t = setTimeout(() => clearInterval(id), 5000);
+      return () => { clearInterval(id); clearTimeout(t); };
     }
-  }, [loading]);
+  }, [loading, forcesReady]);
+
+  // Zoom camera based on risk slider
+  useEffect(() => {
+    if (!forcesReady || !graphRef.current) return;
+    const t = riskLevel / 100;
+    const targetZ = ZOOM_CLOSE + (ZOOM_FAR - ZOOM_CLOSE) * t;
+    graphRef.current.cameraPosition({ z: targetZ }, null, 800);
+  }, [riskLevel, forcesReady]);
 
   const handleNodeClick = useCallback((node) => {
     setSelectedNode(node);
@@ -177,7 +216,6 @@ export default function NetworkGraph() {
       return new THREE.Mesh(geometry, material);
     }
 
-    // New injected nodes get extra glow to stand out
     const group = new THREE.Group();
     group.add(new THREE.Mesh(geometry, material));
     const glowGeometry = new THREE.SphereGeometry(radius * 2.5, 16, 16);
@@ -196,10 +234,12 @@ export default function NetworkGraph() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">Network Explorer</h2>
           <div className="flex items-center gap-3">
-            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Min Risk:</label>
-            <input type="range" min={0} max={80} value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))} className="w-32" />
-            <span className="text-xs font-mono w-8" style={{ color: 'var(--accent-cyan)' }}>{minScore}</span>
+            <label className="text-xs" style={{ color: 'var(--text-secondary)' }}>Risk Depth:</label>
+            <input type="range" min={0} max={100} value={riskLevel}
+              onChange={(e) => setRiskLevel(Number(e.target.value))} className="w-32" />
+            <span className="text-xs font-mono w-12" style={{ color: 'var(--accent-cyan)' }}>
+              {riskLevel === 0 ? 'Low' : riskLevel < 33 ? 'Med' : riskLevel < 66 ? 'High' : 'All'}
+            </span>
             <div className="flex gap-2 ml-4">
               {Object.entries(NODE_COLORS).map(([level, color]) => (
                 <div key={level} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
@@ -211,35 +251,37 @@ export default function NetworkGraph() {
           </div>
         </div>
 
-        <div ref={containerRef} className="flex-1 glass-card-static overflow-hidden" style={{ background: '#030712' }}>
-          {loading ? (
-            <div className="flex items-center justify-center h-full" style={{ color: 'var(--text-secondary)' }}>
-              <div className="text-center">
+        <div ref={containerRef} className="flex-1 glass-card-static overflow-hidden relative"
+          style={{ background: '#030712', height: 'calc(100vh - 140px)' }}>
+          {/* ForceGraph3D is ALWAYS mounted — never unmount/remount WebGL */}
+          <ForceGraph3D
+            ref={graphRef}
+            width={dimensions.width}
+            height={dimensions.height}
+            graphData={graphData}
+            nodeThreeObject={nodeThreeObject}
+            nodeThreeObjectExtend={false}
+            linkColor={() => 'rgba(59, 130, 246, 0.6)'}
+            linkWidth={(link) => Math.max(Math.log(link.txCount + 1) * 0.8, 0.5)}
+            linkOpacity={0.6}
+            linkDirectionalParticles={(link) => Math.min(link.txCount, 4)}
+            linkDirectionalParticleWidth={1.5}
+            linkDirectionalParticleSpeed={(link) => Math.min(link.txCount * 0.002, 0.02)}
+            linkDirectionalParticleColor={() => '#06b6d4'}
+            onNodeClick={handleNodeClick}
+            backgroundColor="#030712"
+            showNavInfo={false}
+            enableNodeDrag={true}
+          />
+          {/* Loading overlay on top of the graph */}
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ background: '#030712', zIndex: 10 }}>
+              <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
                 <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
                   style={{ borderColor: 'var(--accent-cyan)', borderTopColor: 'transparent' }} />
                 Loading network...
               </div>
             </div>
-          ) : (
-            <ForceGraph3D
-              ref={graphRef}
-              width={dimensions.width}
-              height={dimensions.height}
-              graphData={graphData}
-              nodeThreeObject={nodeThreeObject}
-              nodeThreeObjectExtend={false}
-              linkColor={() => 'rgba(59, 130, 246, 0.6)'}
-              linkWidth={(link) => Math.max(Math.log(link.txCount + 1) * 0.8, 0.5)}
-              linkOpacity={0.6}
-              linkDirectionalParticles={(link) => Math.min(link.txCount, 4)}
-              linkDirectionalParticleWidth={1.5}
-              linkDirectionalParticleSpeed={(link) => Math.min(link.txCount * 0.002, 0.02)}
-              linkDirectionalParticleColor={() => '#06b6d4'}
-              onNodeClick={handleNodeClick}
-              backgroundColor="#030712"
-              showNavInfo={false}
-              enableNodeDrag={true}
-            />
           )}
         </div>
       </div>

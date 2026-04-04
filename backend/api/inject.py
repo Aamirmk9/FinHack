@@ -3,6 +3,7 @@
 import hashlib
 import random
 from datetime import datetime
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,7 @@ class TransactionRequest(BaseModel):
     from_address: str
     to_address: str
     amount: float
-    pattern_type: str | None = None
+    pattern_type: Optional[str] = None
 
 
 def _make_tx_hash() -> str:
