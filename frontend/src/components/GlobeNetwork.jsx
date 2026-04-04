@@ -7,14 +7,14 @@ import AnimatedNumber from './AnimatedNumber';
 import useWebSocket from '../hooks/useWebSocket';
 
 const LOCATIONS = [
-  { lat: 40.71, lng: -74.01 }, { lat: 34.05, lng: -118.24 }, { lat: 41.88, lng: -87.63 },
-  { lat: 29.76, lng: -95.37 }, { lat: 33.75, lng: -84.39 }, { lat: 47.61, lng: -122.33 },
-  { lat: 25.76, lng: -80.19 }, { lat: 37.77, lng: -122.42 }, { lat: 42.36, lng: -71.06 },
-  { lat: 38.91, lng: -77.04 }, { lat: 39.95, lng: -75.17 }, { lat: 32.78, lng: -96.80 },
-  { lat: 51.51, lng: -0.13 }, { lat: 48.86, lng: 2.35 }, { lat: 35.68, lng: 139.69 },
-  { lat: 22.32, lng: 114.17 }, { lat: 1.35, lng: 103.82 }, { lat: 55.76, lng: 37.62 },
-  { lat: -23.55, lng: -46.63 }, { lat: 19.43, lng: -99.13 }, { lat: 25.20, lng: 55.27 },
-  { lat: 52.52, lng: 13.41 }, { lat: -33.87, lng: 151.21 }, { lat: 37.57, lng: 126.98 },
+  { lat: 40.71, lng: -74.01, city: 'New York' }, { lat: 34.05, lng: -118.24, city: 'Los Angeles' }, { lat: 41.88, lng: -87.63, city: 'Chicago' },
+  { lat: 29.76, lng: -95.37, city: 'Houston' }, { lat: 33.75, lng: -84.39, city: 'Atlanta' }, { lat: 47.61, lng: -122.33, city: 'Seattle' },
+  { lat: 25.76, lng: -80.19, city: 'Miami' }, { lat: 37.77, lng: -122.42, city: 'San Francisco' }, { lat: 42.36, lng: -71.06, city: 'Boston' },
+  { lat: 38.91, lng: -77.04, city: 'Washington DC' }, { lat: 39.95, lng: -75.17, city: 'Philadelphia' }, { lat: 32.78, lng: -96.80, city: 'Dallas' },
+  { lat: 51.51, lng: -0.13, city: 'London' }, { lat: 48.86, lng: 2.35, city: 'Paris' }, { lat: 35.68, lng: 139.69, city: 'Tokyo' },
+  { lat: 22.32, lng: 114.17, city: 'Hong Kong' }, { lat: 1.35, lng: 103.82, city: 'Singapore' }, { lat: 55.76, lng: 37.62, city: 'Moscow' },
+  { lat: -23.55, lng: -46.63, city: 'São Paulo' }, { lat: 19.43, lng: -99.13, city: 'Mexico City' }, { lat: 25.20, lng: 55.27, city: 'Dubai' },
+  { lat: 52.52, lng: 13.41, city: 'Berlin' }, { lat: -33.87, lng: 151.21, city: 'Sydney' }, { lat: 37.57, lng: 126.98, city: 'Seoul' },
 ];
 
 function assignLocation(id, index) {
@@ -22,7 +22,7 @@ function assignLocation(id, index) {
   for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
   const base = LOCATIONS[Math.abs(hash) % LOCATIONS.length];
   const jit = () => (Math.abs((hash * (index + 1) * 13) % 1000) / 1000 - 0.5) * 5;
-  return { lat: base.lat + jit(), lng: base.lng + jit() };
+  return { lat: base.lat + jit(), lng: base.lng + jit(), city: base.city };
 }
 
 const RISK_COLORS_MAP = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
@@ -86,7 +86,7 @@ export default function GlobeNetwork() {
       const geoNodes = sorted.map((n, i) => {
         const loc = assignLocation(n.id, i);
         const level = getRiskLevel(n.score);
-        return { ...n, lat: loc.lat, lng: loc.lng, riskLevel: level, color: RISK_COLORS_MAP[level] };
+        return { ...n, lat: loc.lat, lng: loc.lng, city: loc.city, riskLevel: level, color: RISK_COLORS_MAP[level] };
       });
 
       const nodeMap = {};
@@ -118,8 +118,7 @@ export default function GlobeNetwork() {
 
   useEffect(() => {
     if (!loading && globeRef.current) {
-      globeRef.current.controls().autoRotate = true;
-      globeRef.current.controls().autoRotateSpeed = 0.3;
+      globeRef.current.controls().autoRotate = false;
       globeRef.current.pointOfView({ lat: 35, lng: -95, altitude: 2.2 }, 1000);
     }
   }, [loading]);
@@ -279,7 +278,7 @@ export default function GlobeNetwork() {
               <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>Wallet Details</p>
               <button onClick={() => {
                 setSelectedNode(null); setWalletDetail(null);
-                if (globeRef.current) { globeRef.current.controls().autoRotate = true; globeRef.current.pointOfView({ altitude: 2.2 }, 1000); }
+                if (globeRef.current) { globeRef.current.pointOfView({ altitude: 2.2 }, 1000); }
               }} style={{ fontSize: 10, color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>Close</button>
             </div>
           </div>
@@ -311,7 +310,7 @@ export default function GlobeNetwork() {
             {/* Location */}
             <div>
               <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Location</p>
-              <p style={{ fontSize: 11, color: '#bbb', margin: 0 }}>{selectedNode.lat.toFixed(2)}°, {selectedNode.lng.toFixed(2)}°</p>
+              <p style={{ fontSize: 11, color: '#bbb', margin: 0 }}>{selectedNode.city} ({selectedNode.lat.toFixed(2)}°, {selectedNode.lng.toFixed(2)}°)</p>
             </div>
 
             {/* Flags */}
