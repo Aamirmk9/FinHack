@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShadowTrace — FinHack 2026</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Playfair+Display:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+  :root {
+    --black: #0c0c0c;
+    --dark: #111111;
+    --dark2: #1a1a1a;
+    --surface: #222222;
+    --border: rgba(255,255,255,0.06);
+    --border2: rgba(255,255,255,0.09);
+    --red: #ef4444;
+    --orange: #f97316;
+    --amber: #fbbf24;
+    --green: #4ade80;
+    --cyan: #22d3ee;
+    --blue: #3b82f6;
+    --purple: #a78bfa;
+    --white: #f0f0f0;
+    --white2: #e0e0e0;
+    --white3: #666666;
+    --white4: #555555;
+    --muted: #444444;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--black);
+    color: var(--white);
+    overflow: hidden;
+    height: 100vh; width: 100vw;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== SLIDE ===== */
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex; flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .slide.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ===== TYPOGRAPHY ===== */
+  .serif { font-family: 'Playfair Display', serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--red);
+    margin-bottom: 12px;
+  }
+  .headline {
+    font-family: 'Playfair Display', serif;
+    font-size: 44px; font-weight: 800;
+    line-height: 1.08;
+  }
+  .rule {
+    width: 40px; height: 2px;
+    background: var(--red);
+    border-radius: 1px;
+    margin: 16px 0;
+  }
+  .body-text {
+    font-size: 15px; color: var(--white3);
+    line-height: 1.65; max-width: 560px;
+  }
+
+  /* ===== CHART AREA ===== */
+  .chart-area {
+    flex: 1; position: relative; overflow: hidden;
+  }
+  .chart-area svg {
+    width: 100%; height: 100%; display: block;
+  }
+
+  /* ===== FLOATING OVERLAY ===== */
+  .overlay {
+    position: absolute; z-index: 5;
+    text-align: center;
+  }
+  .ov-num {
+    font-size: 42px; font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -2px; line-height: 1;
+  }
+  .ov-label {
+    font-size: 9px; color: var(--white4);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    font-weight: 600; margin-top: 4px;
+  }
+
+  /* ===== CONTENT LAYER ===== */
+  .content {
+    position: absolute; inset: 0;
+    z-index: 5;
+    padding: 60px 80px 50px;
+    display: flex; flex-direction: column;
+    pointer-events: none;
+  }
+  .content > * { pointer-events: auto; }
+
+  /* ===== DOT INDICATORS ===== */
+  .dots {
+    position: absolute;
+    bottom: 20px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 6px;
+    z-index: 20;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--surface);
+    transition: all 0.3s ease;
+  }
+  .dot.on {
+    width: 18px; border-radius: 3px;
+    background: var(--red);
+  }
+
+  /* ===== SIDE-BY-SIDE BARS ===== */
+  .compare { display: flex; gap: 48px; }
+  .compare-col { flex: 1; }
+  .compare-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .bar-item { margin-bottom: 14px; }
+  .bar-label {
+    font-size: 12px; color: var(--white4);
+    margin-bottom: 4px; font-weight: 500;
+  }
+  .bar-track {
+    height: 10px; background: var(--surface);
+    border-radius: 5px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 5px;
+    display: flex; align-items: center;
+    padding-left: 8px;
+    font-size: 9px; font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--black);
+  }
+  .bar-val {
+    font-size: 11px; color: var(--muted);
+    margin-top: 3px; text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ===== BULLET LIST ===== */
+  .bl { list-style: none; padding: 0; }
+  .bl li {
+    padding: 5px 0 5px 18px; position: relative;
+    font-size: 14px; line-height: 1.6; color: var(--white3);
+  }
+  .bl li::before {
+    content: ''; position: absolute; left: 0; top: 13px;
+    width: 5px; height: 5px; border-radius: 1px;
+    background: var(--red); transform: rotate(45deg);
+  }
+
+  /* ===== TEAM LIST ===== */
+  .team-row {
+    display: flex; align-items: center; gap: 18px;
+    padding: 12px 0;
+  }
+  .team-av {
+    width: 48px; height: 48px; min-width: 48px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; font-weight: 700;
+    background: var(--dark);
+    border: 2px solid;
+  }
+  .team-name { font-size: 15px; font-weight: 700; }
+  .team-role {
+    font-size: 11px; font-weight: 500;
+    color: var(--white3); margin-top: 2px;
+  }
+
+  /* ===== FLOW ===== */
+  .flow-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .flow-node {
+    padding: 8px 14px; border-radius: 8px;
+    font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    font-weight: 600; white-space: nowrap;
+  }
+  .flow-arr { color: var(--muted); font-size: 14px; }
+
+  /* ===== STEP ITEMS ===== */
+  .step {
+    display: flex; gap: 20px; align-items: flex-start;
+    margin-bottom: 14px;
+  }
+  .step-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 700;
+    color: var(--muted);
+    min-width: 28px; padding-top: 2px;
+  }
+  .step-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .step-desc { font-size: 13px; color: var(--white3); line-height: 1.5; }
+
+  /* ===== TWO COLUMN ===== */
+  .two-col { display: flex; gap: 60px; }
+  .col { flex: 1; }
+
+  .nav-hint {
+    position: fixed; bottom: 6px; right: 12px;
+    font-size: 9px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.25; z-index: 99;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SLIDE 1: TITLE -->
+<!-- ============================================================ -->
+<div class="slide active">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="s1a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient>
+        <linearGradient id="s1b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.12"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient>
+        <linearGradient id="s1c" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.08"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient>
+      </defs>
+      <path d="M0,520 Q200,400 400,440 Q600,480 800,380 Q1000,280 1200,340 Q1300,370 1400,320 L1400,700 L0,700Z" fill="url(#s1c)"/>
+      <path d="M0,500 Q175,370 350,410 Q525,450 700,350 Q875,250 1050,310 Q1225,370 1400,280 L1400,700 L0,700Z" fill="url(#s1b)"/>
+      <path d="M0,480 Q150,350 300,390 Q450,430 600,330 Q750,230 900,290 Q1050,350 1200,260 Q1300,210 1400,240 L1400,700 L0,700Z" fill="url(#s1a)"/>
+      <path d="M0,480 Q150,350 300,390 Q450,430 600,330 Q750,230 900,290 Q1050,350 1200,260 Q1300,210 1400,240" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.5"/>
+      <path d="M0,500 Q175,370 350,410 Q525,450 700,350 Q875,250 1050,310 Q1225,370 1400,280" fill="none" stroke="#a78bfa" stroke-width="1.5" opacity="0.35"/>
+      <circle cx="600" cy="330" r="4" fill="#ef4444" opacity="0.6"/>
+      <circle cx="900" cy="290" r="4" fill="#ef4444" opacity="0.6"/>
+      <circle cx="1200" cy="260" r="4" fill="#ef4444" opacity="0.6"/>
+    </svg>
+  </div>
+  <div class="content" style="justify-content:center; align-items:center; text-align:center;">
+    <div class="label">FinHack 2026 // UTD JSOM</div>
+    <div class="headline" style="font-size:64px;">
+      <span style="color:var(--red);">Shadow</span>Trace
+    </div>
+    <div class="rule" style="margin:18px auto;"></div>
+    <div class="body-text" style="text-align:center; margin:0 auto;">
+      Uncover the hidden networks behind illicit money flows with AI-powered hybrid detection that regulators can act on.
+    </div>
+    <div style="display:flex; gap:40px; margin-top:36px;">
+      <div><div class="ov-num" style="font-size:32px; color:var(--red);">$800B+</div><div class="ov-label">Laundered / Year</div></div>
+      <div><div class="ov-num" style="font-size:32px; color:var(--green);">48x</div><div class="ov-label">Fewer False Positives</div></div>
+      <div><div class="ov-num" style="font-size:32px; color:var(--purple);">98.3%</div><div class="ov-label">F1 Score</div></div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 2: PROBLEM -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s2a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.15"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,550 Q350,450 700,500 Q1050,550 1400,480 L1400,700 L0,700Z" fill="url(#s2a)"/>
+      <path d="M0,550 Q350,450 700,500 Q1050,550 1400,480" fill="none" stroke="#ef4444" stroke-width="1.5" opacity="0.3"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">The Crisis</div>
+    <div class="headline">Financial crime is<br>evolving faster than <span style="color:var(--red);">enforcement</span></div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:36px;">$800 billion to $2 trillion laundered globally every year. Banks spend $8B+ on compliance but intercept less than 1% of illicit flows.</div>
+
+    <div class="two-col" style="max-width:700px;">
+      <div>
+        <div style="font-size:36px; font-weight:800; color:var(--red); font-family:'JetBrains Mono'; line-height:1;">96%</div>
+        <div style="font-size:10px; color:var(--white4); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-top:6px;">False Positive Rate</div>
+        <div style="width:30px; height:2px; background:var(--red); margin:8px 0;"></div>
+        <div style="font-size:13px; color:var(--white3); line-height:1.6;">Rule-based systems flood compliance teams with noise. Analysts waste thousands of hours chasing clean transactions.</div>
+      </div>
+      <div>
+        <div style="font-size:36px; font-weight:800; color:var(--orange); font-family:'JetBrains Mono'; line-height:1;">$8B+</div>
+        <div style="font-size:10px; color:var(--white4); text-transform:uppercase; letter-spacing:1px; font-weight:600; margin-top:6px;">Annual AML Cost</div>
+        <div style="width:30px; height:2px; background:var(--orange); margin:8px 0;"></div>
+        <div style="font-size:13px; color:var(--white3); line-height:1.6;">U.S. bank compliance costs grow 15% year-over-year while criminal networks adopt AI-powered laundering at scale.</div>
+      </div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 3: TEAM -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.08"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,580 Q350,500 700,540 Q1050,580 1400,520 L1400,700 L0,700Z" fill="url(#s3)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">The Team</div>
+    <div class="headline">Built by <span style="color:var(--red);">Four</span></div>
+    <div class="rule"></div>
+
+    <div style="margin-top:12px; max-width:600px;">
+      <div class="team-row">
+        <div class="team-av" style="border-color:var(--red); color:var(--red);">M</div>
+        <div><div class="team-name">Member 1</div><div class="team-role">Lead Engineer -- Detection engine, system architecture, graph analytics pipeline</div></div>
+      </div>
+      <div class="team-row">
+        <div class="team-av" style="border-color:var(--blue); color:var(--blue);">A</div>
+        <div><div class="team-name">Member 2</div><div class="team-role">Data & Analytics -- Risk modeling, feature engineering, FinCEN typology mapping</div></div>
+      </div>
+      <div class="team-row">
+        <div class="team-av" style="border-color:var(--purple); color:var(--purple);">S</div>
+        <div><div class="team-name">Member 3</div><div class="team-role">Product & Design -- Dashboard, network visualization, analyst workflows</div></div>
+      </div>
+      <div class="team-row">
+        <div class="team-av" style="border-color:var(--amber); color:var(--amber);">R</div>
+        <div><div class="team-name">Member 4</div><div class="team-role">Research & Strategy -- Financial crime research, case studies, regulatory alignment</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 4: METHODOLOGY -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="s4a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.12"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient>
+        <linearGradient id="s4b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.08"/><stop offset="100%" stop-color="#3b82f6" stop-opacity="0"/></linearGradient>
+      </defs>
+      <path d="M0,520 Q350,420 700,470 Q1050,520 1400,440 L1400,700 L0,700Z" fill="url(#s4b)"/>
+      <path d="M0,540 Q350,440 700,490 Q1050,540 1400,460 L1400,700 L0,700Z" fill="url(#s4a)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">Methodology</div>
+    <div class="headline">Hybrid Detection <span style="color:var(--red);">Engine</span></div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:28px;">We analyze transaction networks as graphs, then score every wallet by combining compliance rules with machine learning into a single 0-100 risk score.</div>
+
+    <div class="two-col" style="max-width:800px;">
+      <div>
+        <div style="font-size:14px; font-weight:700; color:var(--red); margin-bottom:10px;">Compliance Rules</div>
+        <div style="width:30px; height:2px; background:var(--red); margin-bottom:12px;"></div>
+        <ul class="bl">
+          <li>Structuring: below $10K reporting threshold</li>
+          <li>Rapid relay: 8+ hops in under 1 hour</li>
+          <li>Fan-out/fan-in: 1 to 15+ then reconverging</li>
+          <li>Circular flows: bidirectional fund paths</li>
+          <li>Pass-through: forwarding ~100% of inflows</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:14px; font-weight:700; color:var(--blue); margin-bottom:10px;">ML Classifier</div>
+        <div style="width:30px; height:2px; background:var(--blue); margin-bottom:12px;"></div>
+        <ul class="bl">
+          <li>Random Forest on 9 engineered features per wallet</li>
+          <li>Degree, volume, burst score, active hours, ratios</li>
+          <li>Louvain community detection for clustering</li>
+          <li>8 cluster-level features (density, fan-out, compactness)</li>
+          <li>Balanced class weights for skewed data</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;">
+      <div style="font-family:'JetBrains Mono'; font-size:16px; font-weight:600; color:var(--red);">risk = min( rule_flags x 12 + ml_probability x 50, 100 )</div>
+      <div style="width:30px; height:2px; background:var(--red); margin:8px 0;"></div>
+      <div style="font-size:13px; color:var(--white3);">Rules contribute up to 50 pts. ML contributes up to 50 pts. Combined into one actionable score.</div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 5: TYPOLOGIES -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s5" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.1"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,560 Q350,460 700,510 Q1050,560 1400,490 L1400,700 L0,700Z" fill="url(#s5)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">Detection Patterns</div>
+    <div class="headline">Five patterns,<br>five <span style="color:var(--red);">SAR codes</span></div>
+    <div class="rule"></div>
+
+    <div style="margin-top:8px; max-width:720px;">
+      <div class="step"><div class="step-num" style="color:var(--red);">01</div><div><div class="step-title">Layering <span style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono'; font-weight:400;">SAR-ML-001</span></div><div class="step-desc">Funds split across intermediaries then merged at destination. Multiple hops to obscure origin.</div></div></div>
+      <div class="step"><div class="step-num" style="color:var(--orange);">02</div><div><div class="step-title">Structuring <span style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono'; font-weight:400;">SAR-ML-002</span></div><div class="step-desc">Transactions kept below $10K CTR threshold. "Smurfing" -- many small transfers replace one large one.</div></div></div>
+      <div class="step"><div class="step-num" style="color:var(--purple);">03</div><div><div class="step-title">Round-Tripping <span style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono'; font-weight:400;">SAR-ML-003</span></div><div class="step-desc">Funds circle back through 5-10 hops. Creates the illusion of legitimate business while money never changes hands.</div></div></div>
+      <div class="step"><div class="step-num" style="color:var(--blue);">04</div><div><div class="step-title">Peel Chains <span style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono'; font-weight:400;">SAR-ML-004</span></div><div class="step-desc">8+ hops in under 1 hour. Each hop peels off a fee while the bulk races forward.</div></div></div>
+      <div class="step"><div class="step-num" style="color:var(--cyan);">05</div><div><div class="step-title">Fan-Out / Collection <span style="font-size:11px; color:var(--muted); font-family:'JetBrains Mono'; font-weight:400;">SAR-ML-005</span></div><div class="step-desc">One source to 20+ wallets, then all converge to 1-2 collectors. Common in mixing services.</div></div></div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 6: RESULTS -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="s6a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.25"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient>
+        <linearGradient id="s6b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#f97316" stop-opacity="0.1"/><stop offset="100%" stop-color="#f97316" stop-opacity="0"/></linearGradient>
+      </defs>
+      <!-- Rules line (flat, low) -->
+      <path d="M0,620 Q350,610 700,615 Q1050,608 1400,612 L1400,700 L0,700Z" fill="url(#s6b)"/>
+      <path d="M0,620 Q350,610 700,615 Q1050,608 1400,612" fill="none" stroke="#f97316" stroke-width="1.5" stroke-dasharray="6,4" opacity="0.5"/>
+      <!-- Hybrid line (rising) -->
+      <path d="M0,550 Q200,440 400,360 Q600,280 800,220 Q1000,180 1200,160 Q1300,150 1400,140 L1400,700 L0,700Z" fill="url(#s6a)"/>
+      <path d="M0,550 Q200,440 400,360 Q600,280 800,220 Q1000,180 1200,160 Q1300,150 1400,140" fill="none" stroke="#ef4444" stroke-width="2.5" opacity="0.7"/>
+      <circle cx="600" cy="280" r="5" fill="#ef4444" opacity="0.7"/>
+      <circle cx="1000" cy="180" r="5" fill="#ef4444" opacity="0.7"/>
+      <circle cx="1400" cy="140" r="5" fill="#ef4444" opacity="0.7"/>
+    </svg>
+    <!-- Floating overlays -->
+    <div class="overlay" style="top:12%; right:10%;">
+      <div class="ov-num" style="color:var(--red);">48x</div>
+      <div class="ov-label">Fewer False Positives</div>
+    </div>
+    <div class="overlay" style="top:35%; right:22%;">
+      <div class="ov-num" style="font-size:28px; color:var(--green);">97.9%</div>
+      <div class="ov-label">Precision</div>
+    </div>
+    <div class="overlay" style="top:18%; right:32%;">
+      <div class="ov-num" style="font-size:28px; color:var(--purple);">98.6%</div>
+      <div class="ov-label">Recall</div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="label">Results</div>
+    <div class="headline">From 96% noise to<br><span style="color:var(--green);">2% precision</span></div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:24px;">Validated on 50,000+ transactions across 3,000+ wallets. Our hybrid approach outperforms rule-based detection by 48x while maintaining explainability.</div>
+
+    <div style="display:flex; gap:24px; font-size:12px; max-width:500px;">
+      <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px; height:3px; background:var(--red); border-radius:2px;"></div><span style="color:var(--white3);">ShadowTrace Hybrid -- F1: <span style="color:var(--red); font-weight:700;">98.3%</span></span></div>
+      <div style="display:flex; align-items:center; gap:6px;"><div style="width:14px; height:3px; background:var(--orange); border-radius:2px; opacity:0.5;"></div><span style="color:var(--white3);">Rules Only -- F1: <span style="color:var(--orange); font-weight:700;">3.5%</span></span></div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 7: CASE DIVIDER -->
+<!-- ============================================================ -->
+<div class="slide" style="background:var(--black);">
+  <div class="content" style="justify-content:center; align-items:center; text-align:center;">
+    <div class="label">Case Demonstration</div>
+    <div class="headline" style="font-size:52px;">Follow the <span style="color:var(--red);">Money</span></div>
+    <div class="rule" style="margin:18px auto;"></div>
+    <div class="body-text" style="text-align:center; margin:0 auto;">Tracing $142K through a layering network from initial alert to SAR-ready evidence.</div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 8: CASE STUDY -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s8" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.12"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,560 Q350,470 700,520 Q1050,570 1400,490 L1400,700 L0,700Z" fill="url(#s8)"/>
+    </svg>
+    <div class="overlay" style="top:10%; right:8%;">
+      <div class="ov-num" style="font-size:36px; color:var(--red);">87.3</div>
+      <div class="ov-label">Risk Score</div>
+    </div>
+    <div class="overlay" style="top:10%; right:24%;">
+      <div class="ov-num" style="font-size:28px; color:var(--purple);">$142K</div>
+      <div class="ov-label">Volume</div>
+    </div>
+  </div>
+  <div class="content">
+    <div class="label">Cluster #47 -- Investigation</div>
+    <div class="headline"><span style="color:var(--red);">$142K</span> layering network</div>
+    <div class="rule"></div>
+
+    <div class="body-text" style="margin-bottom:20px;">Source wallet splits $142K across 8 intermediaries. All forward 100% of inflows within minutes. Funds reconverge to a single collector in under 2 hours. $3,500 leaked in chain fees.</div>
+
+    <div class="flow-row">
+      <div class="flow-node" style="background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2);">Source $142K</div>
+      <span class="flow-arr">>>></span>
+      <div class="flow-node" style="background:rgba(249,115,22,0.08); color:var(--orange); border:1px solid rgba(249,115,22,0.15);">L1a $18.2K</div>
+      <div class="flow-node" style="background:rgba(249,115,22,0.08); color:var(--orange); border:1px solid rgba(249,115,22,0.15);">L1b $17.8K</div>
+      <div class="flow-node" style="background:rgba(249,115,22,0.08); color:var(--orange); border:1px solid rgba(249,115,22,0.15);">L1c $19.1K</div>
+      <div class="flow-node" style="color:var(--muted); border:1px solid var(--border);">+5</div>
+      <span class="flow-arr">>>></span>
+      <div class="flow-node" style="background:rgba(167,139,250,0.08); color:var(--purple); border:1px solid rgba(167,139,250,0.15);">L2a $35.4K</div>
+      <div class="flow-node" style="background:rgba(167,139,250,0.08); color:var(--purple); border:1px solid rgba(167,139,250,0.15);">L2b $38.7K</div>
+      <div class="flow-node" style="background:rgba(167,139,250,0.08); color:var(--purple); border:1px solid rgba(167,139,250,0.15);">L2c $33.2K</div>
+      <span class="flow-arr">>>></span>
+      <div class="flow-node" style="background:rgba(239,68,68,0.1); color:var(--red); border:1px solid rgba(239,68,68,0.2);">Collector $138.5K</div>
+    </div>
+
+    <div style="margin-top:16px; font-size:12px; color:var(--muted);">
+      Auto-classified: <span style="color:var(--red); font-weight:600;">SAR-ML-001 (Layering)</span> // Traversal: <span style="color:var(--amber);">1h 47m</span> // Leaked: <span style="color:var(--green);">$3,500</span>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 9: DASHBOARD / WORKFLOW -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s9" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.08"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,580 Q350,500 700,540 Q1050,580 1400,520 L1400,700 L0,700Z" fill="url(#s9)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">Analyst Workflow</div>
+    <div class="headline">Alert to <span style="color:var(--red);">SAR</span> in minutes</div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:28px;">Four integrated views designed around how compliance analysts actually investigate.</div>
+
+    <div class="two-col" style="max-width:800px;">
+      <div>
+        <div class="step"><div class="step-num" style="color:var(--red);">01</div><div><div class="step-title">Dashboard -- Prioritize</div><div class="step-desc">All alerts ranked by risk. Exposure, volume, case counts. Focus on highest threats first.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--blue);">02</div><div><div class="step-title">Network -- Visualize</div><div class="step-desc">Interactive force graph. Risk-colored nodes. Click any wallet for full history and risk breakdown.</div></div></div>
+      </div>
+      <div>
+        <div class="step"><div class="step-num" style="color:var(--purple);">03</div><div><div class="step-title">Investigation -- Understand</div><div class="step-desc">"Why is this suspicious?" with FinCEN tags. Evidence table. SAR narrative generation.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--amber);">04</div><div><div class="step-title">Timeline -- Reconstruct</div><div class="step-desc">Step through transactions chronologically. Watch funds move. Build the enforcement narrative.</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 10: ROI / BUSINESS CASE -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s10" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4ade80" stop-opacity="0.08"/><stop offset="100%" stop-color="#4ade80" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,580 Q350,510 700,550 Q1050,590 1400,530 L1400,700 L0,700Z" fill="url(#s10)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">Business Case</div>
+    <div class="headline">The financial <span style="color:var(--red);">impact</span></div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:32px;">Side-by-side: what compliance looks like before and after ShadowTrace.</div>
+
+    <div class="compare" style="max-width:700px;">
+      <div class="compare-col">
+        <div class="compare-title" style="color:var(--red);">Without</div>
+        <div class="bar-item"><div class="bar-label">False positive time</div><div class="bar-track"><div class="bar-fill" style="width:96%; background:var(--red);">96%</div></div></div>
+        <div class="bar-item"><div class="bar-label">SAR filing time</div><div class="bar-track"><div class="bar-fill" style="width:75%; background:var(--orange);">4-6 hrs</div></div></div>
+        <div class="bar-item"><div class="bar-label">Laundering missed</div><div class="bar-track"><div class="bar-fill" style="width:66%; background:var(--red);">66%</div></div></div>
+      </div>
+      <div class="compare-col">
+        <div class="compare-title" style="color:var(--green);">With ShadowTrace</div>
+        <div class="bar-item"><div class="bar-label">False positive time</div><div class="bar-track"><div class="bar-fill" style="width:4%; background:var(--green); min-width:30px;">2%</div></div></div>
+        <div class="bar-item"><div class="bar-label">SAR filing time</div><div class="bar-track"><div class="bar-fill" style="width:15%; background:var(--green);">~1hr</div></div></div>
+        <div class="bar-item"><div class="bar-label">Laundering missed</div><div class="bar-track"><div class="bar-fill" style="width:3%; background:var(--green); min-width:30px;">1.4%</div></div></div>
+      </div>
+    </div>
+
+    <div style="margin-top:28px; display:flex; gap:40px; max-width:700px;">
+      <div><div style="font-size:13px; font-weight:700;">Compliance Savings</div><div style="width:25px; height:2px; background:var(--green); margin:6px 0;"></div><div style="font-size:12px; color:var(--white3);">Thousands of analyst hours reclaimed annually.</div></div>
+      <div><div style="font-size:13px; font-weight:700;">Regulatory Confidence</div><div style="width:25px; height:2px; background:var(--blue); margin:6px 0;"></div><div style="font-size:12px; color:var(--white3);">Every flag mapped to FinCEN/FATF typologies.</div></div>
+      <div><div style="font-size:13px; font-weight:700;">Better Enforcement</div><div style="width:25px; height:2px; background:var(--purple); margin:6px 0;"></div><div style="font-size:12px; color:var(--white3);">98.6% recall = more prosecutions and seizures.</div></div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 11: NEXT STEPS -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs><linearGradient id="s11" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fbbf24" stop-opacity="0.06"/><stop offset="100%" stop-color="#fbbf24" stop-opacity="0"/></linearGradient></defs>
+      <path d="M0,590 Q350,520 700,560 Q1050,600 1400,540 L1400,700 L0,700Z" fill="url(#s11)"/>
+    </svg>
+  </div>
+  <div class="content">
+    <div class="label">Roadmap</div>
+    <div class="headline">What comes <span style="color:var(--red);">next</span></div>
+    <div class="rule"></div>
+    <div class="body-text" style="margin-bottom:24px;">From hackathon prototype to production-ready FIU platform.</div>
+
+    <div class="two-col" style="max-width:800px;">
+      <div>
+        <div class="step"><div class="step-num" style="color:var(--red);">01</div><div><div class="step-title">Live Blockchain Feeds</div><div class="step-desc">Real-time API integration. Continuous monitoring with streaming graph updates.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--orange);">02</div><div><div class="step-title">Automated SAR Drafting</div><div class="step-desc">LLM-powered narrative generation. SAR writing drops from hours to minutes.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--purple);">03</div><div><div class="step-title">Cross-Chain Tracing</div><div class="step-desc">Follow funds across Bitcoin, Ethereum, and L2 bridges.</div></div></div>
+      </div>
+      <div>
+        <div class="step"><div class="step-num" style="color:var(--blue);">04</div><div><div class="step-title">Case Management</div><div class="step-desc">Analyst assignment, audit logs. Push alerts to Slack, email, SIEM.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--cyan);">05</div><div><div class="step-title">Graph Neural Networks</div><div class="step-desc">GNN-based detection learns structural patterns from topology.</div></div></div>
+        <div class="step"><div class="step-num" style="color:var(--green);">06</div><div><div class="step-title">Multi-Institution Sharing</div><div class="step-desc">Privacy-preserving federated detection across banks and FIUs.</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 12: AI SOURCES CITED -->
+<!-- ============================================================ -->
+<div class="slide" style="background:var(--black);">
+  <div class="content" style="justify-content:center;">
+    <div class="label">References</div>
+    <div class="headline">AI Sources <span style="color:var(--red);">Cited</span></div>
+    <div class="rule"></div>
+    <div style="margin-top:32px; color:var(--muted); font-style:italic; font-size:16px;">
+      [ Sources to be added ]
+    </div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div><div class="dot"></div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SLIDE 13: CLOSING -->
+<!-- ============================================================ -->
+<div class="slide">
+  <div class="chart-area">
+    <svg viewBox="0 0 1400 700" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="s13a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#ef4444" stop-opacity="0.18"/><stop offset="100%" stop-color="#ef4444" stop-opacity="0"/></linearGradient>
+        <linearGradient id="s13b" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.1"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient>
+      </defs>
+      <path d="M0,480 Q200,360 400,400 Q600,440 800,340 Q1000,240 1200,300 Q1300,340 1400,300 L1400,700 L0,700Z" fill="url(#s13b)"/>
+      <path d="M0,500 Q200,380 400,420 Q600,460 800,360 Q1000,260 1200,320 Q1300,360 1400,320 L1400,700 L0,700Z" fill="url(#s13a)"/>
+      <path d="M0,500 Q200,380 400,420 Q600,460 800,360 Q1000,260 1200,320 Q1300,360 1400,320" fill="none" stroke="#ef4444" stroke-width="2" opacity="0.4"/>
+    </svg>
+  </div>
+  <div class="content" style="justify-content:center; align-items:center; text-align:center;">
+    <div class="label">Thank You</div>
+    <div class="headline" style="font-size:60px;"><span style="color:var(--red);">Shadow</span>Trace</div>
+    <div class="rule" style="margin:18px auto;"></div>
+    <div class="body-text" style="text-align:center; margin:0 auto 36px;">Turning opaque fund flows into actionable intelligence.</div>
+
+    <div style="display:flex; gap:40px;">
+      <div><div class="ov-num" style="font-size:32px; color:var(--red);">48x</div><div class="ov-label">Fewer False Positives</div></div>
+      <div><div class="ov-num" style="font-size:32px; color:var(--purple);">98.3%</div><div class="ov-label">Detection Accuracy</div></div>
+      <div><div class="ov-num" style="font-size:32px; color:var(--amber);">5</div><div class="ov-label">FinCEN Typologies</div></div>
+    </div>
+
+    <div style="margin-top:40px; font-size:10px; color:var(--muted); font-family:'JetBrains Mono'; letter-spacing:1.2px;">FINHACK 2026 // UTD JSOM FINANCE LAB</div>
+  </div>
+  <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot on"></div></div>
+</div>
+
+<div class="nav-hint">Arrow keys or click</div>
+
+<script>
+  const slides = document.querySelectorAll('.slide');
+  let current = 0;
+
+  function goTo(n) {
+    if (n < 0 || n >= slides.length) return;
+    slides[current].classList.remove('active');
+    current = n;
+    slides[current].classList.add('active');
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '||e.key==='ArrowDown'){e.preventDefault();goTo(current+1);}
+    if (e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();goTo(current-1);}
+    if (e.key==='Home') goTo(0);
+    if (e.key==='End') goTo(slides.length-1);
+  });
+
+  document.addEventListener('click', e => {
+    if (e.clientX > window.innerWidth/2) goTo(current+1);
+    else goTo(current-1);
+  });
+</script>
+</body>
+</html>

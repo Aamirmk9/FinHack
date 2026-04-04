@@ -17,7 +17,11 @@
       "Bash(git checkout:*)",
       "Bash(git push:*)",
       "Bash(git pull:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(pip3 show:*)",
+      "Bash(python3 build_pptx.py)",
+      "Bash(python3 -m http.server 8888)",
+      "Bash(echo \"Server PID: $!\")"
     ]
   },
   "enabledPlugins": {
