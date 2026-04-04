@@ -1,10 +1,12 @@
 """FastAPI application — runs the full detection pipeline on startup."""
 
 import time
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes import router, set_state
+from api.inject import inject_router
+from api.websocket import manager
 from data.generator import generate_dataset
 from engine.graph_builder import build_graph
 from engine.community import detect_communities
@@ -15,13 +17,25 @@ from engine.typology import classify_all_clusters
 from engine.freeze_priority import compute_all_freeze_priorities
 from engine.known_actors import scan_all_clusters
 
-app = FastAPI(title="ShadowTrace API", version="2.0.0")
+app = FastAPI(title="ShadowTrace API", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
 app.include_router(router)
+app.include_router(inject_router)
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive, listen for pings
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 
 @app.on_event("startup")
@@ -59,6 +73,7 @@ def run_pipeline():
     wallet_scores = detector.run(graph, transactions, node_features, cluster_features, labels)
     set_state("wallet_scores", wallet_scores)
     set_state("ml_metrics", detector.ml_metrics)
+    set_state("_detector", detector)  # Store for live re-scoring
     print(f"       ML metrics: {detector.ml_metrics}")
 
     print("[6/9] Scoring clusters...")
@@ -92,4 +107,6 @@ def run_pipeline():
 
     elapsed = round(time.time() - t0, 1)
     print(f"\nPipeline complete in {elapsed}s")
+    print(f"Live injection ready at POST /api/inject")
+    print(f"WebSocket updates at ws://0.0.0.0:8000/ws")
     print("=" * 60)

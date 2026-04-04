@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { fetchNetwork, fetchWallet } from '../api/client';
 import { truncateAddress, formatCurrency, riskColor, riskLabel } from '../utils/formatters';
 import AnimatedNumber from './AnimatedNumber';
+import useWebSocket from '../hooks/useWebSocket';
 
 const NODE_COLORS = {
   critical: '#ef4444',
@@ -28,6 +29,15 @@ export default function NetworkGraph() {
   const graphRef = useRef();
   const containerRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const { lastUpdate } = useWebSocket();
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Auto-refresh when a live transaction is injected
+  useEffect(() => {
+    if (lastUpdate && lastUpdate.type === 'transaction_injected') {
+      setRefreshKey(k => k + 1);
+    }
+  }, [lastUpdate]);
 
   useEffect(() => {
     const updateSize = () => {
@@ -62,7 +72,7 @@ export default function NetworkGraph() {
       });
       setLoading(false);
     });
-  }, [minScore]);
+  }, [minScore, refreshKey]);
 
   // Auto-rotate
   useEffect(() => {
