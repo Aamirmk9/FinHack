@@ -295,7 +295,7 @@ export default function DemoWallet() {
             { icon: '↑', label: 'Send', action: () => { setMode('send'); setRecipient(''); } },
             { icon: '↓', label: 'Request', action: () => { setMode('receive'); setRecipient(''); } },
             { icon: '⚡', label: 'Structure', action: runStructuring, danger: true },
-            { icon: '≡', label: 'More', action: () => {} },
+            { icon: '≡', label: 'More', action: () => { setMode(null); setAmount(''); setRecipient(''); } },
           ].map(btn => (
             <button key={btn.label} onClick={btn.action} disabled={structuring && btn.label === 'Structure'}
               style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: 'none', background: 'none', cursor: 'pointer' }}>

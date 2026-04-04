@@ -6,8 +6,8 @@ import { fetchAlerts, fetchTimeline } from '../api/client';
 import { truncateAddress, formatCurrency } from '../utils/formatters';
 
 const tt = {
-  background: 'var(--bg-card)', border: '1px solid #1a1a1a',
-  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#bbb',
+  background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', color: '#bbb',
 };
 
 export default function Timeline() {
@@ -21,14 +21,14 @@ export default function Timeline() {
     fetchAlerts(20).then((data) => {
       setAlerts(data);
       if (data.length > 0) loadTimeline(data[0].cluster_id);
-    });
+    }).catch(() => {});
   }, []);
 
   const loadTimeline = (clusterId) => {
     setSelectedCluster(clusterId);
     setCurrentIndex(0);
     setPlaying(false);
-    fetchTimeline(clusterId).then((data) => setTimelineData(data.timeline || []));
+    fetchTimeline(clusterId).then((data) => setTimelineData(data.timeline || [])).catch(() => setTimelineData([]));
   };
 
   useEffect(() => {
@@ -131,7 +131,7 @@ export default function Timeline() {
 
       {/* Transaction flow table */}
       <div className="glass-card" style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>Transaction Flow</p>
           <span style={{ fontSize: 10, color: '#666' }}>{visibleTxns.length} transactions</span>
         </div>
@@ -141,7 +141,7 @@ export default function Timeline() {
           display: 'grid', gridTemplateColumns: '36px 1fr 20px 1fr 90px 80px',
           padding: '6px 16px', fontSize: 9, fontWeight: 600, color: '#666',
           textTransform: 'uppercase', letterSpacing: 0.5, background: '#161616',
-          borderBottom: '1px solid rgba(0,0,0,0.04)',
+          borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
           <span>#</span><span>From</span><span></span><span>To</span>
           <span style={{ textAlign: 'right' }}>Amount</span><span style={{ textAlign: 'right' }}>Pattern</span>
@@ -154,7 +154,7 @@ export default function Timeline() {
               <div key={i} style={{
                 display: 'grid', gridTemplateColumns: '36px 1fr 20px 1fr 90px 80px',
                 padding: '7px 16px', fontSize: 11, alignItems: 'center',
-                borderBottom: '1px solid rgba(0,0,0,0.03)',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
                 background: isActive ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)',
                 borderLeft: isActive ? '2px solid #ef4444' : '2px solid transparent',
               }}>

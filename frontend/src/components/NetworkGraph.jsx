@@ -119,7 +119,7 @@ export default function NetworkGraph() {
         })),
       });
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [refreshKey]);
 
   // Setup forces ONCE when graph ref becomes available and data is loaded.

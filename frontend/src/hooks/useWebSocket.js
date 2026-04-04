@@ -8,9 +8,9 @@ export default function useWebSocket() {
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // In dev mode, Vite proxies /api but not /ws — connect directly to backend
-    const host = window.location.hostname;
-    const wsUrl = `${protocol}//${host}:8000/ws`;
+    // Use /ws path (proxied by Vite) so it works through tunnels too
+    const host = window.location.host;
+    const wsUrl = `${protocol}//${host}/ws`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

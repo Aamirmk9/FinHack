@@ -113,7 +113,7 @@ export default function GlobeNetwork() {
       setNodes(geoNodes);
       setArcs(geoArcs);
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [refreshKey]);
 
   useEffect(() => {

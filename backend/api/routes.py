@@ -1,9 +1,35 @@
 """FastAPI route definitions."""
 
+import math
 import os
 
 import pandas as pd
 from fastapi import APIRouter, Query
+
+
+def _clean_val(v):
+    """Replace NaN/inf/pandas-NA with None."""
+    if v is None:
+        return None
+    try:
+        if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+            return None
+    except (TypeError, ValueError):
+        pass
+    try:
+        import pandas as pd
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return v
+
+def _clean_records(records):
+    """Replace NaN/inf values with None for JSON serialization."""
+    for rec in records:
+        for k, v in rec.items():
+            rec[k] = _clean_val(v)
+    return records
 
 router = APIRouter(prefix="/api")
 
@@ -128,6 +154,7 @@ def get_cluster(cluster_id: int):
     member_set = set(members)
     cluster_txns = txns[txns["from_address"].isin(member_set) & txns["to_address"].isin(member_set)].copy()
     cluster_txns["timestamp"] = cluster_txns["timestamp"].astype(str)
+    cluster_txns = cluster_txns.fillna("")
 
     wallet_details = []
     for m in members:
@@ -151,7 +178,7 @@ def get_cluster(cluster_id: int):
         "risk_level": cluster["risk_level"], "size": cluster["size"],
         "density": cluster["density"], "total_volume": cluster["total_volume"],
         "flags": cluster["flags"], "wallets": wallet_details,
-        "transactions": cluster_txns.to_dict(orient="records"),
+        "transactions": cluster_txns.pipe(lambda df: _clean_records(df.to_dict(orient="records"))),
         # Typology
         "typology": typo,
         # Freeze priority
@@ -174,6 +201,7 @@ def get_wallet(address: str):
 
     wallet_txns = txns[(txns["from_address"] == address) | (txns["to_address"] == address)].copy()
     wallet_txns["timestamp"] = wallet_txns["timestamp"].astype(str)
+    wallet_txns = wallet_txns.fillna("")
 
     # Check known actor direct match
     from engine.known_actors import check_address_match
@@ -190,7 +218,7 @@ def get_wallet(address: str):
         "first_active": nd.get("first_active"),
         "last_active": nd.get("last_active"),
         "known_actor_match": actor_match,
-        "transactions": wallet_txns.head(100).to_dict(orient="records"),
+        "transactions": wallet_txns.head(100).pipe(lambda df: _clean_records(df.to_dict(orient="records"))),
     }
 
 
@@ -215,7 +243,7 @@ def get_timeline(cluster_id: int):
         entries.append({
             "timestamp": str(row["timestamp"]), "from": row["from_address"],
             "to": row["to_address"], "amount": row["amount"],
-            "pattern_type": row.get("pattern_type"),
+            "pattern_type": _clean_val(row.get("pattern_type")),
         })
 
     return {"cluster_id": cluster_id, "timeline": entries}

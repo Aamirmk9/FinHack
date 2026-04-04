@@ -8,8 +8,8 @@ import { truncateAddress, formatCurrency, riskColor } from '../utils/formatters'
 import SARModal from './SARModal';
 
 const tt = {
-  background: 'var(--bg-card)', border: '1px solid #1a1a1a',
-  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#bbb',
+  background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', color: '#bbb',
 };
 
 export default function InvestigationPanel() {
@@ -22,16 +22,24 @@ export default function InvestigationPanel() {
   const [sarLoading, setSarLoading] = useState(false);
 
   useEffect(() => {
-    fetchAlerts(20).then(setAlerts);
-    const clusterId = searchParams.get('cluster');
-    if (clusterId) selectCluster(Number(clusterId));
+    fetchAlerts(20).then((data) => {
+      setAlerts(data);
+      const clusterId = searchParams.get('cluster');
+      if (clusterId) {
+        selectCluster(Number(clusterId));
+      } else if (data.length > 0) {
+        selectCluster(data[0].cluster_id);
+      }
+    }).catch(() => setAlerts([]));
   }, []);
 
   const selectCluster = (id) => {
     setSelectedClusterId(id);
     setLoading(true);
     setSarData(null);
-    fetchCluster(id).then((data) => { setClusterData(data); setLoading(false); });
+    fetchCluster(id)
+      .then((data) => { setClusterData(data); setLoading(false); })
+      .catch(() => { setClusterData(null); setLoading(false); });
   };
 
   const handleGenerateSAR = async () => {
@@ -58,7 +66,7 @@ export default function InvestigationPanel() {
 
       {/* ═══ LEFT: Cluster list ═══ */}
       <div className="glass-card" style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+        <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>Flagged Clusters</p>
           <p style={{ fontSize: 10, color: '#666', margin: '2px 0 0' }}>{alerts.length} ranked by risk</p>
         </div>
@@ -68,7 +76,7 @@ export default function InvestigationPanel() {
           display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
           padding: '6px 14px', fontSize: 9, fontWeight: 600, color: '#666',
           textTransform: 'uppercase', letterSpacing: 0.5,
-          background: '#161616', borderBottom: '1px solid rgba(0,0,0,0.04)',
+          background: '#161616', borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}>
           <span>ID</span><span>Type</span><span>Level</span><span style={{ textAlign: 'right' }}>Risk</span>
         </div>
@@ -80,7 +88,7 @@ export default function InvestigationPanel() {
               style={{
                 display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
                 padding: '8px 14px', cursor: 'pointer', alignItems: 'center',
-                borderBottom: '1px solid rgba(0,0,0,0.03)',
+                borderBottom: '1px solid rgba(255,255,255,0.03)',
                 background: selectedClusterId === alert.cluster_id ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)',
                 borderLeft: selectedClusterId === alert.cluster_id ? '2px solid #ef4444' : '2px solid transparent',
                 transition: 'background 0.1s',
@@ -306,7 +314,7 @@ export default function InvestigationPanel() {
 
             {/* Transaction table */}
             <div className="glass-card" style={{ overflow: 'hidden' }}>
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <p style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0', margin: 0 }}>
                   Transactions
                 </p>
@@ -318,7 +326,7 @@ export default function InvestigationPanel() {
                   display: 'grid', gridTemplateColumns: '1fr 1fr 90px 140px 70px',
                   padding: '6px 16px', fontSize: 9, fontWeight: 600, color: '#666',
                   textTransform: 'uppercase', letterSpacing: 0.5,
-                  background: '#161616', borderBottom: '1px solid rgba(0,0,0,0.04)',
+                  background: '#161616', borderBottom: '1px solid rgba(255,255,255,0.04)',
                   position: 'sticky', top: 0,
                 }}>
                   <span>From</span><span>To</span><span style={{ textAlign: 'right' }}>Amount</span>
@@ -328,7 +336,7 @@ export default function InvestigationPanel() {
                   <div key={i} style={{
                     display: 'grid', gridTemplateColumns: '1fr 1fr 90px 140px 70px',
                     padding: '6px 16px', fontSize: 10, alignItems: 'center',
-                    borderBottom: '1px solid rgba(0,0,0,0.03)',
+                    borderBottom: '1px solid rgba(255,255,255,0.03)',
                   }}>
                     <span style={{ fontFamily: 'monospace', color: '#bbb' }}>{truncateAddress(tx.from_address)}</span>
                     <span style={{ fontFamily: 'monospace', color: '#bbb' }}>{truncateAddress(tx.to_address)}</span>

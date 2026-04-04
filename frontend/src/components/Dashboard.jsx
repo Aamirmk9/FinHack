@@ -44,8 +44,8 @@ const generateRadarData = () => {
 };
 
 const tt = {
-  background: 'var(--bg-card)', border: '1px solid #1a1a1a',
-  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.08)', color: '#bbb',
+  background: 'var(--bg-card)', border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.3)', color: '#bbb',
 };
 
 export default function Dashboard() {
@@ -59,9 +59,9 @@ export default function Dashboard() {
   const { lastUpdate } = useWebSocket();
 
   useEffect(() => {
-    fetchStats().then(setStats);
-    fetchAlerts(10).then(setAlerts);
-    fetchCompare().then(setCompare);
+    fetchStats().then(setStats).catch(() => {});
+    fetchAlerts(10).then(setAlerts).catch(() => {});
+    fetchCompare().then(setCompare).catch(() => {});
   }, []);
 
   const [alertBanner, setAlertBanner] = useState(null);
@@ -373,7 +373,7 @@ export default function Dashboard() {
       {/* ═══ RIGHT ═══ */}
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 12,
-        borderLeft: '1px solid rgba(0,0,0,0.06)', paddingLeft: 20, overflow: 'auto',
+        borderLeft: '1px solid rgba(255,255,255,0.06)', paddingLeft: 20, overflow: 'auto',
       }}>
 
         {/* Threats */}
@@ -386,7 +386,7 @@ export default function Dashboard() {
           <div className="glass-card" style={{ flex: 1, overflow: 'auto' }}>
             <div style={{
               display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
-              padding: '7px 12px', borderBottom: '1px solid rgba(0,0,0,0.06)',
+              padding: '7px 12px', borderBottom: '1px solid rgba(255,255,255,0.06)',
               fontSize: 9, fontWeight: 600, color: '#666',
               textTransform: 'uppercase', letterSpacing: 0.5,
               background: '#161616', borderRadius: '10px 10px 0 0',
@@ -405,7 +405,7 @@ export default function Dashboard() {
                 style={{
                   display: 'grid', gridTemplateColumns: '40px 1fr 48px 36px',
                   padding: '7px 12px', cursor: 'pointer',
-                  borderBottom: '1px solid rgba(0,0,0,0.04)',
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
                   background: alert.isLive ? 'rgba(239,68,68,0.06)' : 'var(--bg-card)',
                   transition: 'background 0.15s', alignItems: 'center',
                 }}
