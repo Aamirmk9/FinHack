@@ -63,7 +63,7 @@ export default function Timeline() {
       </div>
 
       <div className="flex items-center gap-4 rounded-xl p-4 border"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        className="glass-card-static">
         <button onClick={() => {
           if (currentIndex >= timelineData.length) setCurrentIndex(0);
           setPlaying(!playing);
@@ -85,7 +85,7 @@ export default function Timeline() {
         </span>
       </div>
 
-      <div className="rounded-xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="rounded-xl p-5 border" className="glass-card-static">
         <h3 className="text-sm font-semibold mb-3">Cumulative Fund Flow</h3>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={cumulativeData}>
@@ -102,8 +102,8 @@ export default function Timeline() {
       </div>
 
       <div className="flex-1 rounded-xl border overflow-y-auto"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+        className="glass-card-static">
+        <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
           <h3 className="text-sm font-semibold">Transaction Flow</h3>
         </div>
         <div className="p-4 space-y-2">

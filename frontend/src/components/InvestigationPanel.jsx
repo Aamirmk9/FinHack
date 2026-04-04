@@ -52,12 +52,12 @@ export default function InvestigationPanel() {
     <div className="flex h-full gap-4">
       {/* Cluster List — now with typology + freeze priority */}
       <div className="w-80 rounded-xl border overflow-y-auto flex-shrink-0"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+        className="glass-card-static">
+        <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
           <h3 className="text-sm font-semibold">Flagged Clusters</h3>
           <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>{alerts.length} clusters ranked by risk</p>
         </div>
-        <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+        <div className="divide-y" style={{ borderColor: 'var(--glass-border)' }}>
           {alerts.map((alert) => (
             <div key={alert.cluster_id} className="px-4 py-3 cursor-pointer transition-colors"
               style={{ background: selectedClusterId === alert.cluster_id ? 'var(--bg-card-hover)' : 'transparent', borderColor: 'var(--border)' }}
@@ -173,7 +173,7 @@ export default function InvestigationPanel() {
             {/* Freeze Priority + Known Actor — side by side */}
             <div className="grid grid-cols-2 gap-4">
               {/* Freeze Priority */}
-              <div className="rounded-xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <div className="rounded-xl p-5 border" className="glass-card-static">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold">Freeze Priority</h3>
                   <span className="text-xs px-2 py-0.5 rounded font-bold"
@@ -256,7 +256,7 @@ export default function InvestigationPanel() {
                 { label: 'Internal Txns', value: clusterData.transactions?.length || 0 },
               ].map(({ label, value }) => (
                 <div key={label} className="rounded-lg p-3 border"
-                  style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                  className="glass-card-static">
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</p>
                   <p className="text-lg font-bold">{value}</p>
                 </div>
@@ -264,7 +264,7 @@ export default function InvestigationPanel() {
             </div>
 
             {/* Why Suspicious */}
-            <div className="rounded-xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="rounded-xl p-5 border" className="glass-card-static">
               <h3 className="text-sm font-semibold mb-3">Flagged Indicators</h3>
               <div className="flex flex-wrap gap-2">
                 {clusterData.flags?.map((flag) => (
@@ -278,7 +278,7 @@ export default function InvestigationPanel() {
             </div>
 
             {/* Wallet Risk Scores */}
-            <div className="rounded-xl p-5 border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="rounded-xl p-5 border" className="glass-card-static">
               <h3 className="text-sm font-semibold mb-3">Wallet Risk Scores</h3>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={(clusterData.wallets || []).slice(0, 15).map((w) => ({
@@ -297,8 +297,8 @@ export default function InvestigationPanel() {
             </div>
 
             {/* Transaction Table */}
-            <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+            <div className="rounded-xl border overflow-hidden" className="glass-card-static">
+              <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
                 <h3 className="text-sm font-semibold">Cluster Transactions ({clusterData.transactions?.length || 0})</h3>
               </div>
               <div className="overflow-x-auto max-h-80">
@@ -314,7 +314,7 @@ export default function InvestigationPanel() {
                   </thead>
                   <tbody>
                     {(clusterData.transactions || []).slice(0, 50).map((tx, i) => (
-                      <tr key={i} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                      <tr key={i} className="border-t" style={{ borderColor: 'var(--glass-border)' }}>
                         <td className="px-4 py-2 font-mono">{truncateAddress(tx.from_address)}</td>
                         <td className="px-4 py-2 font-mono">{truncateAddress(tx.to_address)}</td>
                         <td className="px-4 py-2 text-right font-mono">{formatCurrency(tx.amount)}</td>

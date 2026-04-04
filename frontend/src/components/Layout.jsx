@@ -9,44 +9,52 @@ const navItems = [
 
 export default function Layout() {
   return (
-    <div className="flex h-screen">
-      <nav
-        className="w-60 flex-shrink-0 flex flex-col border-r"
-        style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border)' }}
-      >
-        <div className="p-5 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: 'var(--accent-cyan)' }}>
-            ShadowTrace
-          </h1>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-            AI Money Laundering Detection
+    <div className="flex h-screen" style={{ background: 'var(--bg-primary)' }}>
+      {/* Glassmorphism Sidebar */}
+      <nav className="w-60 flex-shrink-0 flex flex-col glass" style={{ borderRight: '1px solid var(--glass-border)' }}>
+        <div className="p-5 border-b" style={{ borderColor: 'var(--glass-border)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--accent-cyan)', boxShadow: '0 0 8px var(--accent-cyan)' }} />
+            <h1 className="text-lg font-bold tracking-tight" style={{ color: 'var(--accent-cyan)' }}>
+              ShadowTrace
+            </h1>
+          </div>
+          <p className="text-xs mt-1.5 tracking-wider uppercase" style={{ color: 'var(--text-secondary)', letterSpacing: '0.15em' }}>
+            Financial Intelligence
           </p>
         </div>
-        <div className="flex-1 py-4">
+        <div className="flex-1 py-3">
           {navItems.map(({ to, label, icon }) => (
             <NavLink
               key={to}
               to={to}
+              end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-5 py-3 text-sm transition-colors ${isActive ? 'font-semibold' : ''}`
+                `flex items-center gap-3 px-5 py-3 text-sm transition-all duration-200 ${isActive ? 'font-semibold' : ''}`
               }
               style={({ isActive }) => ({
                 color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                background: isActive ? 'rgba(6, 182, 212, 0.08)' : 'transparent',
-                borderRight: isActive ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                background: isActive ? 'rgba(6, 182, 212, 0.06)' : 'transparent',
+                borderLeft: isActive ? '2px solid var(--accent-cyan)' : '2px solid transparent',
+                boxShadow: isActive ? 'inset 0 0 30px rgba(6, 182, 212, 0.03)' : 'none',
               })}
             >
-              <span className="text-lg">{icon}</span>
+              <span className="text-base opacity-70">{icon}</span>
               {label}
             </NavLink>
           ))}
         </div>
-        <div className="p-4 border-t text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
-          FinHack 2026 — Case 1
+        <div className="p-4 border-t" style={{ borderColor: 'var(--glass-border)' }}>
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--risk-low)' }} />
+            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Pipeline Active</span>
+          </div>
+          <p className="text-xs mt-1 opacity-40">FinHack 2026</p>
         </div>
       </nav>
 
-      <main className="flex-1 overflow-auto p-6" style={{ background: 'var(--bg-primary)' }}>
+      {/* Main content */}
+      <main className="flex-1 overflow-auto p-6 relative" style={{ background: 'var(--bg-primary)' }}>
         <Outlet />
       </main>
     </div>
