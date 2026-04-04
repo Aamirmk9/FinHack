@@ -3,7 +3,22 @@
     "allow": [
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npm run:*)"
+      "Bash(npm --version)",
+      "Bash(pip3 install:*)",
+      "Bash(npm install:*)",
+      "Bash(python3 main.py)",
+      "Bash(curl -s http://localhost:8000/api/stats)",
+      "Bash(echo \"Backend PID: $!\")",
+      "Bash(echo \"PID: $!\")",
+      "Read(//private/tmp/**)",
+      "Bash(python3 -m uvicorn main:app --host 0.0.0.0 --port 8000)",
+      "Bash(python3 -m json.tool)",
+      "Bash(npx vite:*)",
+      "Bash(git checkout:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git rebase:*)"
     ]
   },
   "enabledPlugins": {

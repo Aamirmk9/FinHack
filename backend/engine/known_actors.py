@@ -10,6 +10,8 @@ Source: FBI Public Service Announcement, February 26, 2025
 $1.5 billion in virtual assets from the cryptocurrency exchange, Bybit."
 """
 
+from typing import Optional
+
 import numpy as np
 
 # FBI-published Lazarus Group (TraderTraitor) Ethereum addresses — Bybit hack, Feb 2025
@@ -80,7 +82,7 @@ LAZARUS_BEHAVIORAL_PROFILE = {
 }
 
 
-def check_address_match(wallet_address: str) -> dict | None:
+def check_address_match(wallet_address: str) -> Optional[dict]:
     """Check if a wallet address directly matches a known Lazarus Group address."""
     normalized = wallet_address.lower().strip()
     if normalized in LAZARUS_GROUP_ADDRESSES:

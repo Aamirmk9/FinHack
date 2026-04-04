@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import * as THREE from 'three';
+import { forceRadial } from 'd3-force-3d';
 import { fetchNetwork, fetchWallet } from '../api/client';
 import { truncateAddress, formatCurrency, riskColor, riskLabel } from '../utils/formatters';
 import AnimatedNumber from './AnimatedNumber';
@@ -8,16 +9,32 @@ import useWebSocket from '../hooks/useWebSocket';
 
 const NODE_COLORS = {
   critical: '#ef4444',
-  high: '#f59e0b',
+  high: '#f97316',
   medium: '#eab308',
   low: '#22c55e',
 };
 
-function getRiskLevel(score) {
-  if (score >= 70) return 'critical';
-  if (score >= 40) return 'high';
-  if (score >= 20) return 'medium';
-  return 'low';
+const SHELL_RADII = {
+  low: 60,
+  medium: 120,
+  high: 180,
+  critical: 240,
+};
+
+const RISK_LEVELS = ['low', 'medium', 'high', 'critical'];
+
+// Assign risk levels by rank so each quartile gets exactly ~25% of nodes,
+// regardless of score ties at boundaries.
+function assignRiskLevels(nodes) {
+  const indexed = nodes.map((n, i) => ({ i, score: n.score }));
+  indexed.sort((a, b) => a.score - b.score);
+  const n = indexed.length;
+  const assignments = new Array(n);
+  for (let rank = 0; rank < n; rank++) {
+    const quartile = Math.min(Math.floor((rank / n) * 4), 3);
+    assignments[indexed[rank].i] = RISK_LEVELS[quartile];
+  }
+  return assignments;
 }
 
 export default function NetworkGraph() {
@@ -71,12 +88,13 @@ export default function NetworkGraph() {
   useEffect(() => {
     setLoading(true);
     fetchNetwork(minScore, 400).then((data) => {
+      const levels = assignRiskLevels(data.nodes);
       setGraphData({
-        nodes: data.nodes.map((n) => ({
+        nodes: data.nodes.map((n, i) => ({
           ...n,
-          val: Math.max(Math.sqrt(n.tx_count) * 1.5, 2),
-          riskLevel: getRiskLevel(n.score),
-          nodeColor: NODE_COLORS[getRiskLevel(n.score)],
+          val: 3,
+          riskLevel: levels[i],
+          nodeColor: NODE_COLORS[levels[i]],
         })),
         links: data.edges.map((e) => ({
           source: e.source,
@@ -89,7 +107,7 @@ export default function NetworkGraph() {
     });
   }, [minScore, refreshKey]);
 
-  // Auto-rotate + zoom to fit all nodes
+  // Auto-rotate + radial shell forces
   useEffect(() => {
     if (!loading && graphRef.current) {
       const controls = graphRef.current.controls();
@@ -97,12 +115,31 @@ export default function NetworkGraph() {
         controls.autoRotate = true;
         controls.autoRotateSpeed = 0.5;
       }
-      // Zoom out enough to see the full graph
-      setTimeout(() => {
-        if (graphRef.current) {
-          graphRef.current.zoomToFit(800, 80);
-        }
-      }, 500);
+      graphRef.current.cameraPosition({ z: 500 });
+
+      // Radial force — pulls each node to its risk-level shell
+      const radial = forceRadial((node) => SHELL_RADII[node.riskLevel] || 120)
+        .strength(0.3);
+      graphRef.current.d3Force('radial', radial);
+
+      // Limit charge repulsion to nearby nodes so shells don't fight each other
+      const charge = graphRef.current.d3Force('charge');
+      if (charge) {
+        charge.strength(-30);
+        charge.distanceMax(100);
+      }
+
+      // Weaken links so they don't drag nodes across shells
+      const link = graphRef.current.d3Force('link');
+      if (link) {
+        link.distance(30);
+        link.strength(0.2);
+      }
+
+      // Remove centering force — radial force handles positioning
+      graphRef.current.d3Force('center', null);
+
+      graphRef.current.d3ReheatSimulation();
     }
   }, [loading]);
 
@@ -124,54 +161,32 @@ export default function NetworkGraph() {
 
   const nodeThreeObject = useCallback((node) => {
     const isNew = newNodeIds.has(node.id);
-    const color = isNew ? '#ff2020' : node.nodeColor;
-    const radius = isNew ? Math.max(node.val * 2.5, 6) : node.val;
-    const group = new THREE.Group();
+    const color = new THREE.Color(isNew ? '#ff2020' : node.nodeColor);
+    const radius = isNew ? 6 : 3;
 
     const geometry = new THREE.SphereGeometry(radius, 20, 20);
     const material = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(color),
+      color,
       transparent: true,
-      opacity: isNew ? 1.0 : 0.85,
-      emissive: new THREE.Color(color),
-      emissiveIntensity: isNew ? 0.8 : (node.score >= 40 ? 0.4 : 0.15),
+      opacity: 0.9,
+      emissive: color,
+      emissiveIntensity: isNew ? 0.8 : 0.3,
     });
+
+    if (!isNew) {
+      return new THREE.Mesh(geometry, material);
+    }
+
+    // New injected nodes get extra glow to stand out
+    const group = new THREE.Group();
     group.add(new THREE.Mesh(geometry, material));
-
-    // Ring for high-risk or new nodes
-    if (node.score >= 40 || isNew) {
-      const ringGeometry = new THREE.RingGeometry(radius + 1.5, radius + 2.5, 32);
-      const ringMaterial = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(color),
-        transparent: true,
-        opacity: isNew ? 0.6 : 0.25,
-        side: THREE.DoubleSide,
-      });
-      group.add(new THREE.Mesh(ringGeometry, ringMaterial));
-    }
-
-    // Outer glow for critical or new nodes
-    if (node.score >= 70 || isNew) {
-      const glowGeometry = new THREE.SphereGeometry(radius * 2.5, 16, 16);
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(isNew ? '#ff0000' : color),
-        transparent: true,
-        opacity: isNew ? 0.15 : 0.08,
-      });
-      group.add(new THREE.Mesh(glowGeometry, glowMaterial));
-    }
-
-    // Extra pulsing outer shell for brand-new injected nodes
-    if (isNew) {
-      const pulseGeometry = new THREE.SphereGeometry(radius * 4, 16, 16);
-      const pulseMaterial = new THREE.MeshBasicMaterial({
-        color: new THREE.Color('#ff0000'),
-        transparent: true,
-        opacity: 0.05,
-      });
-      group.add(new THREE.Mesh(pulseGeometry, pulseMaterial));
-    }
-
+    const glowGeometry = new THREE.SphereGeometry(radius * 2.5, 16, 16);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#ff0000'),
+      transparent: true,
+      opacity: 0.12,
+    });
+    group.add(new THREE.Mesh(glowGeometry, glowMaterial));
     return group;
   }, [newNodeIds]);
 
@@ -213,9 +228,9 @@ export default function NetworkGraph() {
               graphData={graphData}
               nodeThreeObject={nodeThreeObject}
               nodeThreeObjectExtend={false}
-              linkColor={() => 'rgba(59, 130, 246, 0.12)'}
-              linkWidth={(link) => Math.max(Math.log(link.txCount + 1) * 0.3, 0.2)}
-              linkOpacity={0.3}
+              linkColor={() => 'rgba(59, 130, 246, 0.6)'}
+              linkWidth={(link) => Math.max(Math.log(link.txCount + 1) * 0.8, 0.5)}
+              linkOpacity={0.6}
               linkDirectionalParticles={(link) => Math.min(link.txCount, 4)}
               linkDirectionalParticleWidth={1.5}
               linkDirectionalParticleSpeed={(link) => Math.min(link.txCount * 0.002, 0.02)}

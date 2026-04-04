@@ -8,6 +8,7 @@ Ranks flagged clusters by how urgently they need human attention based on:
 """
 
 from datetime import datetime
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +20,7 @@ def compute_freeze_priority(
     wallet_scores: dict,
     transactions: pd.DataFrame,
     typology_info: dict,
-    reference_time: datetime | None = None,
+    reference_time: Optional[datetime] = None,
 ) -> dict:
     """Compute a 0-100 freeze priority score for a cluster.
 
