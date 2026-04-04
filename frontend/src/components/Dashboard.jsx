@@ -103,15 +103,38 @@ export default function Dashboard() {
               <div className="flex items-center gap-4">
                 <div className="w-3 h-3 rounded-full" style={{ background: RISK_COLORS[alert.risk_level] }} />
                 <div>
-                  <span className="text-sm font-medium">Cluster #{alert.cluster_id}</span>
-                  <span className="text-xs ml-3" style={{ color: 'var(--text-secondary)' }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Cluster #{alert.cluster_id}</span>
+                    {alert.typology && alert.typology !== 'Unclassified' && (
+                      <span className="text-xs px-1.5 py-0.5 rounded"
+                        style={{ background: 'rgba(6, 182, 212, 0.15)', color: 'var(--accent-cyan)' }}>
+                        {alert.typology}
+                      </span>
+                    )}
+                    {alert.known_actor_label && (
+                      <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                        style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)' }}>
+                        {alert.known_actor_label}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {alert.size} wallets · {formatCurrency(alert.total_volume)}
                   </span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                {alert.freeze_urgency && alert.freeze_urgency !== 'low' && (
+                  <span className="text-xs px-2 py-0.5 rounded font-semibold"
+                    style={{
+                      background: alert.freeze_urgency === 'critical' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                      color: alert.freeze_urgency === 'critical' ? 'var(--risk-critical)' : 'var(--risk-high)',
+                    }}>
+                    {alert.freeze_urgency === 'critical' ? 'URGENT' : 'HIGH PRIORITY'}
+                  </span>
+                )}
                 <div className="flex gap-1">
-                  {alert.flags.slice(0, 3).map((flag) => (
+                  {alert.flags.slice(0, 2).map((flag) => (
                     <span key={flag} className="text-xs px-2 py-0.5 rounded"
                       style={{ background: 'rgba(239, 68, 68, 0.15)', color: 'var(--risk-critical)' }}>
                       {flag.replace(/_/g, ' ')}
