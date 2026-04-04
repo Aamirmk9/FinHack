@@ -330,9 +330,8 @@ TOP SUSPICIOUS WALLETS:
 {chr(10).join(f'- {addr[:10]}...{addr[-4:]} (score: {score})' for addr, score in top_wallets)}
 """
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        # Generate a template-based SAR if no API key
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key or api_key == "" or not api_key.startswith("sk-"):
         return _generate_template_sar(cluster_id, cluster, typo, fp, ka, total_volume, n_txns, top_wallets)
 
     try:

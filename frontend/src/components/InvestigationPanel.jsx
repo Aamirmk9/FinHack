@@ -38,10 +38,14 @@ export default function InvestigationPanel() {
 
   const handleGenerateSAR = () => {
     setSarLoading(true);
-    generateSAR(selectedClusterId).then((data) => {
-      setSarData(data);
-      setSarLoading(false);
-    });
+    generateSAR(selectedClusterId)
+      .then((data) => {
+        setSarData(data);
+        setSarLoading(false);
+      })
+      .catch(() => {
+        setSarLoading(false);
+      });
   };
 
   const typo = clusterData?.typology || {};
