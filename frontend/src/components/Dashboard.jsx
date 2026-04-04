@@ -64,6 +64,8 @@ export default function Dashboard() {
     fetchCompare().then(setCompare);
   }, []);
 
+  const [alertBanner, setAlertBanner] = useState(null);
+
   useEffect(() => {
     if (lastUpdate && lastUpdate.type === 'transaction_injected') {
       fetchStats().then(setStats);
@@ -75,6 +77,16 @@ export default function Dashboard() {
           flags: [...(lastUpdate.sender.flags || []), ...(lastUpdate.receiver.flags || [])],
           timestamp: Date.now(),
         }, ...prev.slice(0, 4)]);
+
+        // Show fullscreen alert banner
+        setAlertBanner({
+          ...lastUpdate.alert,
+          amount: lastUpdate.transaction.amount,
+          from: lastUpdate.transaction.from_address,
+          to: lastUpdate.transaction.to_address,
+        });
+        // Auto-dismiss after 8 seconds
+        setTimeout(() => setAlertBanner(null), 8000);
       }
     }
   }, [lastUpdate]);
@@ -124,6 +136,72 @@ export default function Dashboard() {
   const mlMetrics = stats.ml_metrics;
 
   return (
+    <>
+    {/* ═══ FULLSCREEN ALERT BANNER ═══ */}
+    {alertBanner && (
+      <div onClick={() => setAlertBanner(null)} style={{
+        position: 'fixed', inset: 0, zIndex: 100,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+        animation: 'alertBannerIn 0.3s ease-out',
+        cursor: 'pointer',
+      }}>
+        <div style={{
+          textAlign: 'center', padding: '40px 60px', borderRadius: 20,
+          background: '#1a1a1a', border: '2px solid rgba(239,68,68,0.3)',
+          boxShadow: '0 0 80px rgba(239,68,68,0.15), 0 0 200px rgba(239,68,68,0.05)',
+          animation: 'alertPulse 1.5s ease-in-out infinite',
+          maxWidth: 600,
+        }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: 30, background: 'rgba(239,68,68,0.1)',
+            border: '2px solid rgba(239,68,68,0.3)', margin: '0 auto 20px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28,
+          }}>⚠</div>
+          <p style={{ fontSize: 11, letterSpacing: 3, color: '#ef4444', fontWeight: 700, margin: '0 0 8px', textTransform: 'uppercase' }}>
+            Threat Detected
+          </p>
+          <p style={{ fontSize: 32, fontWeight: 800, color: '#fff', margin: '0 0 6px' }}>
+            {alertBanner.typology || 'Suspicious Activity'}
+          </p>
+          <p style={{ fontSize: 14, color: '#999', margin: '0 0 20px' }}>
+            Cluster #{alertBanner.cluster_id} · Risk Level: <span style={{ color: '#ef4444', fontWeight: 700 }}>{alertBanner.risk_level?.toUpperCase()}</span>
+          </p>
+          <div style={{
+            display: 'flex', justifyContent: 'center', gap: 24, padding: '16px 0',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div>
+              <p style={{ fontSize: 9, color: '#666', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>Risk Score</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#ef4444', margin: 0 }}>{alertBanner.score?.toFixed?.(1)}</p>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <div>
+              <p style={{ fontSize: 9, color: '#666', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>Amount</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#f97316', margin: 0 }}>${alertBanner.amount?.toLocaleString()}</p>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.06)' }} />
+            <div>
+              <p style={{ fontSize: 9, color: '#666', margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: 1 }}>Wallets</p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: '#eab308', margin: 0 }}>{alertBanner.size}</p>
+            </div>
+          </div>
+          <p style={{ fontSize: 11, color: '#555', marginTop: 16 }}>Click anywhere to dismiss</p>
+        </div>
+      </div>
+    )}
+
+    <style>{`
+      @keyframes alertBannerIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes alertPulse {
+        0%, 100% { box-shadow: 0 0 80px rgba(239,68,68,0.15), 0 0 200px rgba(239,68,68,0.05); }
+        50% { box-shadow: 0 0 120px rgba(239,68,68,0.25), 0 0 300px rgba(239,68,68,0.1); }
+      }
+    `}</style>
+
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 310px', gap: 20, height: '100%' }}>
 
       {/* ═══ LEFT ═══ */}
@@ -388,5 +466,6 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+    </>
   );
 }

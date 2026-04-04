@@ -137,7 +137,7 @@ export default function InvestigationPanel() {
                     border: 'none', cursor: 'pointer',
                     background: sarLoading ? '#222222' : '#ef4444', color: sarLoading ? '#666' : '#fff',
                   }}>
-                  {sarLoading ? 'Generating...' : 'Generate SAR'}
+                  {sarLoading ? 'Analyzing...' : 'Generate Intel Report'}
                 </button>
                 <div style={{ textAlign: 'right' }}>
                   <p style={{ fontSize: 24, fontWeight: 800, color: riskColor(clusterData.score), margin: 0, lineHeight: 1 }}>
