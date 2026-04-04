@@ -10,10 +10,10 @@ export const formatNumber = (n) =>
   new Intl.NumberFormat('en-US').format(n);
 
 export const riskColor = (score) => {
-  if (score >= 70) return '#dc2626';
-  if (score >= 40) return '#ea580c';
-  if (score >= 20) return '#d97706';
-  return '#16a34a';
+  if (score >= 70) return '#ef4444';
+  if (score >= 40) return '#f97316';
+  if (score >= 20) return '#eab308';
+  return '#22c55e';
 };
 
 export const riskLabel = (score) => {
