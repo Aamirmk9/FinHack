@@ -28,15 +28,15 @@ function assignLocation(id, index) {
 const RISK_COLORS_MAP = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e' };
 
 function getRiskLevel(score) {
-  if (score >= 70) return 'critical';
-  if (score >= 40) return 'high';
-  if (score >= 20) return 'medium';
+  if (score >= 51) return 'critical';
+  if (score >= 37) return 'high';
+  if (score >= 25) return 'medium';
   return 'low';
 }
 
 // Only show top N most interesting wallets
-const MAX_NODES = 60;
-const MAX_ARCS = 80;
+const MAX_NODES = 400;
+const MAX_ARCS = 200;
 
 export default function GlobeNetwork() {
   const [nodes, setNodes] = useState([]);
@@ -264,6 +264,7 @@ export default function GlobeNetwork() {
               </div>
             </div>
           )}
+
         </div>
       </div>
 
@@ -293,7 +294,7 @@ export default function GlobeNetwork() {
             <div style={{ display: 'flex', gap: 16 }}>
               <div>
                 <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Risk Score</p>
-                <p style={{ fontSize: 22, fontWeight: 800, color: riskColor(selectedNode.score), margin: 0 }}>
+                <p style={{ fontSize: 22, fontWeight: 800, color: selectedNode.color, margin: 0 }}>
                   <AnimatedNumber value={selectedNode.score} />
                 </p>
               </div>
@@ -301,9 +302,9 @@ export default function GlobeNetwork() {
                 <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Level</p>
                 <span style={{
                   fontSize: 9, padding: '3px 8px', borderRadius: 4, fontWeight: 700,
-                  background: `${riskColor(selectedNode.score)}15`, color: riskColor(selectedNode.score),
+                  background: `${selectedNode.color}15`, color: selectedNode.color,
                   display: 'inline-block', marginTop: 4, textTransform: 'uppercase',
-                }}>{riskLabel(selectedNode.score)}</span>
+                }}>{selectedNode.riskLevel}</span>
               </div>
             </div>
 

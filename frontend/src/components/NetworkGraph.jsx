@@ -21,23 +21,29 @@ const SHELL_RADII = {
   critical: 240,
 };
 
-const RISK_LEVELS = ['low', 'medium', 'high', 'critical'];
+const CITIES = [
+  'New York', 'Los Angeles', 'Chicago', 'Houston', 'Atlanta', 'Seattle',
+  'Miami', 'San Francisco', 'Boston', 'Washington DC', 'Philadelphia', 'Dallas',
+  'London', 'Paris', 'Tokyo', 'Hong Kong', 'Singapore', 'Moscow',
+  'São Paulo', 'Mexico City', 'Dubai', 'Berlin', 'Sydney', 'Seoul',
+];
+
+function assignCity(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  return CITIES[Math.abs(hash) % CITIES.length];
+}
 
 const EMPTY_GRAPH = { nodes: [], links: [] };
 
 const ZOOM_CLOSE = 120;
 const ZOOM_FAR = 550;
 
-function assignRiskLevels(nodes) {
-  const indexed = nodes.map((n, i) => ({ i, score: n.score }));
-  indexed.sort((a, b) => a.score - b.score);
-  const n = indexed.length;
-  const assignments = new Array(n);
-  for (let rank = 0; rank < n; rank++) {
-    const quartile = Math.min(Math.floor((rank / n) * 4), 3);
-    assignments[indexed[rank].i] = RISK_LEVELS[quartile];
-  }
-  return assignments;
+function getRiskLevel(score) {
+  if (score >= 51) return 'critical';
+  if (score >= 37) return 'high';
+  if (score >= 25) return 'medium';
+  return 'low';
 }
 
 export default function NetworkGraph() {
@@ -100,14 +106,11 @@ export default function NetworkGraph() {
   useEffect(() => {
     setLoading(true);
     fetchNetwork(0, 400).then((data) => {
-      const levels = assignRiskLevels(data.nodes);
       setGraphData({
-        nodes: data.nodes.map((n, i) => ({
-          ...n,
-          val: 3,
-          riskLevel: levels[i],
-          nodeColor: NODE_COLORS[levels[i]],
-        })),
+        nodes: data.nodes.map((n) => {
+          const level = getRiskLevel(n.score);
+          return { ...n, val: 3, riskLevel: level, nodeColor: NODE_COLORS[level] };
+        }),
         links: data.edges.map((e) => ({
           source: e.source,
           target: e.target,
@@ -135,7 +138,7 @@ export default function NetworkGraph() {
           controls.autoRotateSpeed = 0.5;
         }
 
-        fg.cameraPosition({ z: ZOOM_CLOSE });
+        fg.cameraPosition({ z: ZOOM_FAR });
 
         const radial = forceRadial((node) => SHELL_RADII[node.riskLevel] || 120)
           .strength(0.3);
@@ -178,7 +181,7 @@ export default function NetworkGraph() {
   useEffect(() => {
     if (!forcesReady || !graphRef.current) return;
     const t = riskLevel / 100;
-    const targetZ = ZOOM_CLOSE + (ZOOM_FAR - ZOOM_CLOSE) * t;
+    const targetZ = ZOOM_FAR - (ZOOM_FAR - ZOOM_CLOSE) * t;
     graphRef.current.cameraPosition({ z: targetZ }, null, 800);
   }, [riskLevel, forcesReady]);
 
@@ -238,7 +241,7 @@ export default function NetworkGraph() {
             <input type="range" min={0} max={100} value={riskLevel}
               onChange={(e) => setRiskLevel(Number(e.target.value))} className="w-32" />
             <span className="text-xs font-mono w-12" style={{ color: 'var(--accent-cyan)' }}>
-              {riskLevel === 0 ? 'Low' : riskLevel < 33 ? 'Med' : riskLevel < 66 ? 'High' : 'All'}
+              {riskLevel === 0 ? 'All' : riskLevel < 33 ? 'High' : riskLevel < 66 ? 'Med' : 'Low'}
             </span>
             <div className="flex gap-2 ml-4">
               {Object.entries(NODE_COLORS).map(([level, color]) => (
@@ -287,100 +290,140 @@ export default function NetworkGraph() {
       </div>
 
       {selectedNode && (
-        <div className="w-80 glass-card overflow-y-auto animate-slide-in-right glow-cyan">
-          <div className="p-4 border-b" style={{ borderColor: 'var(--glass-border)' }}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Wallet Details</h3>
-              <button onClick={() => { setSelectedNode(null); setWalletDetail(null); }}
-                className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-secondary)' }}>Close</button>
-            </div>
+        <div className="glass-card overflow-y-auto animate-slide-in-right" style={{
+          width: 300, flexShrink: 0,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.03) inset',
+        }}>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#e0e0e0' }}>Wallet Details</span>
+            <button onClick={() => { setSelectedNode(null); setWalletDetail(null); }}
+              style={{ fontSize: 10, color: '#666', background: 'none', border: 'none', cursor: 'pointer' }}>Close</button>
           </div>
-          <div className="p-4 space-y-4">
+          <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {/* Address */}
             <div>
-              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Address</p>
-              <p className="text-xs font-mono break-all" style={{ color: 'var(--accent-cyan)' }}>{selectedNode.id}</p>
+              <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Address</p>
+              <p style={{ fontSize: 10, fontFamily: 'monospace', color: selectedNode.nodeColor, margin: 0, wordBreak: 'break-all' }}>{selectedNode.id}</p>
             </div>
-            <div className="flex gap-4">
+
+            {/* Score + Level */}
+            <div style={{ display: 'flex', gap: 16 }}>
               <div>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Risk Score</p>
-                <p className="text-2xl font-bold" style={{ color: riskColor(selectedNode.score) }}>
+                <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Risk Score</p>
+                <p style={{ fontSize: 22, fontWeight: 800, color: selectedNode.nodeColor, margin: 0 }}>
                   <AnimatedNumber value={selectedNode.score} />
                 </p>
               </div>
               <div>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Risk Level</p>
-                <span className="text-xs px-2 py-1 rounded font-semibold inline-block mt-1"
-                  style={{ background: `${riskColor(selectedNode.score)}18`, color: riskColor(selectedNode.score) }}>
-                  {riskLabel(selectedNode.score)}
-                </span>
+                <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Level</p>
+                <span style={{
+                  fontSize: 9, padding: '3px 8px', borderRadius: 4, fontWeight: 700,
+                  background: `${selectedNode.nodeColor}15`, color: selectedNode.nodeColor,
+                  display: 'inline-block', marginTop: 4, textTransform: 'uppercase',
+                }}>{selectedNode.riskLevel}</span>
               </div>
             </div>
+
+            {/* Location */}
+            <div>
+              <p style={{ fontSize: 9, color: '#666', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Location</p>
+              <p style={{ fontSize: 11, color: '#bbb', margin: 0 }}>{assignCity(selectedNode.id)}</p>
+            </div>
+
+            {/* Flags */}
             {selectedNode.flags?.length > 0 && (
               <div>
-                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Flags</p>
-                <div className="flex flex-wrap gap-1">
+                <p style={{ fontSize: 9, color: '#666', margin: '0 0 5px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Flags</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {selectedNode.flags.map((flag) => (
-                    <span key={flag} className="text-xs px-2 py-0.5 rounded"
-                      style={{ background: 'rgba(239, 68, 68, 0.12)', color: 'var(--risk-critical)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
-                      {flag.replace(/_/g, ' ')}
-                    </span>
+                    <span key={flag} style={{
+                      fontSize: 9, padding: '2px 7px', borderRadius: 4,
+                      background: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                      border: '1px solid rgba(239,68,68,0.12)',
+                    }}>{flag.replace(/_/g, ' ')}</span>
                   ))}
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
+
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
-                { label: 'Total Sent', value: formatCurrency(selectedNode.total_sent) },
-                { label: 'Total Received', value: formatCurrency(selectedNode.total_received) },
+                { label: 'Sent', value: formatCurrency(selectedNode.total_sent) },
+                { label: 'Received', value: formatCurrency(selectedNode.total_received) },
                 { label: 'Transactions', value: selectedNode.tx_count },
                 { label: 'Community', value: '#' + selectedNode.community },
               ].map(({ label, value }) => (
                 <div key={label}>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{label}</p>
-                  <p className="text-sm font-semibold">{value}</p>
+                  <p style={{ fontSize: 9, color: '#666', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</p>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#e0e0e0', margin: 0 }}>{value}</p>
                 </div>
               ))}
             </div>
+
+            {/* Score breakdown */}
             {walletDetail && (
-              <div className="animate-fade-in">
-                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Score Breakdown</p>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span>Rule-based</span>
-                    <span className="font-mono">{walletDetail.rule_score}</span>
+              <div>
+                <p style={{ fontSize: 9, color: '#666', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 0.5 }}>Score Breakdown</p>
+                {[
+                  { label: 'Rule-based', value: walletDetail.rule_score, color: '#ef4444' },
+                  { label: 'ML Probability', value: (walletDetail.ml_probability * 100).toFixed(1), color: '#f97316' },
+                ].map(b => (
+                  <div key={b.label} style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 2 }}>
+                      <span style={{ color: '#999' }}>{b.label}</span>
+                      <span style={{ fontFamily: 'monospace', color: '#bbb' }}>{b.value}%</span>
+                    </div>
+                    <div style={{ height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.04)' }}>
+                      <div style={{ height: '100%', borderRadius: 2, width: `${b.value}%`, background: b.color }} />
+                    </div>
                   </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(100, 140, 200, 0.1)' }}>
-                    <div className="h-full rounded-full transition-all duration-1000"
-                      style={{ width: walletDetail.rule_score + '%', background: 'var(--accent-blue)', boxShadow: '0 0 6px var(--accent-blue)' }} />
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span>ML Probability</span>
-                    <span className="font-mono">{(walletDetail.ml_probability * 100).toFixed(1)}%</span>
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(100, 140, 200, 0.1)' }}>
-                    <div className="h-full rounded-full transition-all duration-1000"
-                      style={{ width: (walletDetail.ml_probability * 100) + '%', background: 'var(--accent-cyan)', boxShadow: '0 0 6px var(--accent-cyan)' }} />
-                  </div>
-                </div>
+                ))}
               </div>
             )}
+
+            {/* Transactions */}
             {walletDetail?.transactions?.length > 0 && (
-              <div className="animate-fade-in">
-                <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>
-                  Recent Transactions ({walletDetail.transactions.length})
+              <div>
+                <p style={{ fontSize: 9, color: '#666', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Transactions ({walletDetail.transactions.length})
                 </p>
-                <div className="space-y-1 max-h-60 overflow-y-auto">
-                  {walletDetail.transactions.slice(0, 20).map((tx, i) => (
-                    <div key={i} className="text-xs p-2 rounded"
-                      style={{ background: 'rgba(10, 18, 32, 0.5)', border: '1px solid var(--glass-border)' }}>
-                      <div className="flex justify-between">
-                        <span style={{ color: tx.from_address === selectedNode.id ? 'var(--risk-critical)' : 'var(--risk-low)' }}>
-                          {tx.from_address === selectedNode.id ? 'SENT' : 'RECV'}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '32px 1fr 1fr 60px',
+                  padding: '4px 8px', fontSize: 8, fontWeight: 600, color: '#555',
+                  textTransform: 'uppercase', letterSpacing: 0.5,
+                  background: 'rgba(255,255,255,0.02)', borderRadius: '4px 4px 0 0',
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                }}>
+                  <span>Dir</span><span>From</span><span>To</span><span style={{ textAlign: 'right' }}>Amt</span>
+                </div>
+                <div style={{ maxHeight: 240, overflow: 'auto' }}>
+                  {walletDetail.transactions.slice(0, 20).map((tx, i) => {
+                    const isSent = tx.from_address === selectedNode.id;
+                    return (
+                      <div key={i} style={{
+                        display: 'grid', gridTemplateColumns: '32px 1fr 1fr 60px',
+                        padding: '5px 8px', alignItems: 'center',
+                        borderBottom: '1px solid rgba(255,255,255,0.03)', fontSize: 9,
+                      }}>
+                        <span style={{ color: isSent ? '#ef4444' : '#4ade80', fontWeight: 700, fontSize: 8 }}>
+                          {isSent ? 'SENT' : 'RECV'}
                         </span>
-                        <span className="font-mono">{formatCurrency(tx.amount)}</span>
+                        <span style={{ fontFamily: 'monospace', color: isSent ? '#ef4444' : '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {truncateAddress(tx.from_address)}
+                        </span>
+                        <span style={{ fontFamily: 'monospace', color: !isSent ? '#4ade80' : '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {truncateAddress(tx.to_address)}
+                        </span>
+                        <span style={{ fontFamily: 'monospace', color: '#bbb', textAlign: 'right' }}>
+                          {formatCurrency(tx.amount)}
+                        </span>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
