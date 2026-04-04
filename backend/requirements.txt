@@ -1,0 +1,7 @@
+fastapi==0.115.12
+uvicorn==0.34.2
+networkx==3.4.2
+python-louvain==0.16
+scikit-learn==1.6.1
+pandas==2.2.3
+numpy==2.2.4
