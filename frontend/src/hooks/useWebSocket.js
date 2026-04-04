@@ -7,10 +7,16 @@ export default function useWebSocket() {
   const reconnectTimer = useRef(null);
 
   const connect = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use /ws path (proxied by Vite) so it works through tunnels too
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws`;
+    const backendUrl = import.meta.env.VITE_API_URL || '';
+    let wsUrl;
+    if (backendUrl) {
+      // Remote backend — convert https://foo.com to wss://foo.com/ws
+      wsUrl = backendUrl.replace(/^http/, 'ws') + '/ws';
+    } else {
+      // Local dev — use proxy through Vite
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/ws`;
+    }
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
