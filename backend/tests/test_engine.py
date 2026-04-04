@@ -3,6 +3,7 @@ from data.generator import generate_dataset
 from engine.graph_builder import build_graph
 from engine.community import detect_communities
 from engine.features import compute_node_features, compute_cluster_features
+from engine.detector import RuleBasedDetector, MLDetector, HybridDetector
 
 
 @pytest.fixture
@@ -57,3 +58,30 @@ def test_compute_cluster_features(small_dataset):
     sample = list(cluster_features.values())[0]
     expected_keys = {"size", "density", "avg_tx_volume", "fan_out_ratio", "temporal_compactness"}
     assert expected_keys.issubset(set(sample.keys()))
+
+
+def test_rule_based_detector_flags_suspicious(small_dataset):
+    txns, labels = small_dataset
+    G = build_graph(txns)
+    communities = detect_communities(G)
+    node_feats = compute_node_features(G, communities)
+    rule_detector = RuleBasedDetector()
+    flags = rule_detector.detect(G, txns, node_feats)
+    assert isinstance(flags, dict)
+    flagged = {k for k, v in flags.items() if len(v) > 0}
+    assert len(flagged) > 0
+
+
+def test_hybrid_detector_produces_scores(small_dataset):
+    txns, labels = small_dataset
+    G = build_graph(txns)
+    communities = detect_communities(G)
+    node_feats = compute_node_features(G, communities)
+    cluster_feats = compute_cluster_features(G, communities, node_feats)
+    detector = HybridDetector()
+    scores = detector.run(G, txns, node_feats, cluster_feats, labels)
+    assert isinstance(scores, dict)
+    for addr, score_data in scores.items():
+        assert 0 <= score_data["score"] <= 100
+        assert "flags" in score_data
+        assert "ml_probability" in score_data
