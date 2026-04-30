@@ -5,9 +5,13 @@ export default function useWebSocket() {
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const failureCount = useRef(0);
 
   const connect = useCallback(() => {
     const backendUrl = import.meta.env.VITE_API_URL || '';
+    const isProdSnapshot = !backendUrl && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+    if (isProdSnapshot) return; // static snapshot deploy — no live websocket
+
     let wsUrl;
     if (backendUrl) {
       // Remote backend — convert https://foo.com to wss://foo.com/ws
@@ -42,7 +46,8 @@ export default function useWebSocket() {
     ws.onclose = () => {
       setConnected(false);
       clearInterval(ws._keepalive);
-      // Reconnect after 2s
+      failureCount.current += 1;
+      if (failureCount.current > 5) return; // give up after repeated failures
       reconnectTimer.current = setTimeout(connect, 2000);
     };
 
